@@ -2,6 +2,9 @@
 .gradle/
 build/
 
+# Mac OS specifics
+.DS_Store
+
 # Local configuration file (sdk path, etc)
 local.properties
 
