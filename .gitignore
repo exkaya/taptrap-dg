@@ -5,6 +5,26 @@ build/
 # Mac OS specifics
 .DS_Store
 
+# Generated TLS/CA material
+*.key
+*.crt
+*.csr
+*.srl
+*.pem
+*.der
+*.cer
+*.p7b
+*.p7c
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Generated OpenSSL config files
+rootCA.cnf
+server.cnf
+
+
 # Local configuration file (sdk path, etc)
 local.properties
 
