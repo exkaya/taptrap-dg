@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="de" translate="no" style="width: 100%;height: 100%;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="google" content="notranslate">
+  <meta http-equiv="Content-Language" content="de">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zugriffsanforderer</title>
+</head>
+  <body translate="no" class="notranslate" style="width: 100%;height: 100%;">
+  <h1>Zugriffsanforderer</h1>
+  <script>
+
+    async function requestGeoLocationPermission() {
+        if ('geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition((position) => {
+                // Access granted - process the location
+                try {
+                    const { latitude, longitude } = position.coords;
+                    console.log('Ortszugriff gewährt.');
+                    console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
+                } catch (e) {
+                    console.log(e)
+                }
+                updatePermission();
+
+            }, (error) => {
+                // Access denied or error occurred
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        console.log('Ortszugriff verwehrt vom Benutzer.');
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        console.log('Ortinformationen sind nicht vorhanden.');
+                        break;
+                    case error.TIMEOUT:
+                        console.log('Die Anfrage zum Ort des Benutzers ist zeitlich abgelaufen.');
+                        break;
+                    default:
+                        console.log('Ein unbekannter Fehler ist aufgetreten.');
+                        break;
+                }
+            });
+        }
+    }
+
+    async function requestCameraPermission() {
+        try {
+            await navigator.mediaDevices.getUserMedia({ video: true });
+            console.log('Camera Zugriffsrechte wurden gewährt.');
+            updatePermission();
+        } catch (error) {
+            console.log('Camera Zugriffsrechte verwehrt.');
+        }
+    }
+
+    async function updatePermission() {
+        window.location = '/success';
+    }
+
+    function getQueryParams() {
+        const params = {};
+        const queryString = window.location.search;
+        if (queryString) {
+            const urlParams = new URLSearchParams(queryString);
+            for (const [key, value] of urlParams.entries()) {
+                params[key] = value;
+            }
+        }
+        return params;
+    }
+
+    window.onload = function() {
+        window.QUERY = getQueryParams();
+        if (window.QUERY['access'] == 'camera') {
+            requestCameraPermission();
+        }
+        if (window.QUERY['access'] == 'geolocation') {
+            requestGeoLocationPermission();
+        }
+        document.body.addEventListener('click', function () {
+            window.location = "/success";
+        }, true); 
+    }
+
+  </script>
+</body>
+</html>

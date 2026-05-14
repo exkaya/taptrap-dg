@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="de" translate="no" style="width: 100%;height: 100%;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="google" content="notranslate">
+  <meta http-equiv="Content-Language" content="de">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Permission Requester</title>
+</head>
+<body translate="no" class="notranslate" style="width: 100%;height: 100%;">
+  <main class="page">
+    <h1>Success!</h1>
+    <section class="card wide">
+      <h1>Kamera und Location</h1>
+
+      <div class="status-grid">
+        <div>
+          <h2>Kamera</h2>
+          <p id="cameraStatus">Kamera-Berechtigung wird angefragt...</p>
+        </div>
+
+        <div>
+          <h2>Location</h2>
+          <p id="locationStatus">Location-Status wird geladen...</p>
+        </div>
+      </div>
+
+      <video id="cameraPreview" autoplay playsinline muted></video>
+    </section>
+  </main>
+  <script>
+    const cameraStatusElement = document.getElementById("cameraStatus");
+    const locationStatusElement = document.getElementById("locationStatus");
+    const cameraPreviewElement = document.getElementById("cameraPreview");
+
+    let cameraStarted = false;
+    let locationWatchId = null;
+
+    function renderSavedLocation() {
+      const rawLocation = sessionStorage.getItem("locationPermissionResult");
+
+      if (!rawLocation) {
+        locationStatusElement.textContent = "Es wurde vorher kein Location-Ergebnis gespeichert.";
+        return;
+      }
+
+      const location = JSON.parse(rawLocation);
+
+      if (!location.allowed) {
+        locationStatusElement.textContent = "Location wurde vorher nicht freigegeben.";
+        return;
+      }
+
+      locationStatusElement.textContent =
+        `Location erlaubt: ${location.latitude}, ${location.longitude} (Genauigkeit: ${Math.round(location.accuracy)} m)`;
+    }
+
+    function startLocationWatcherIfAllowed() {
+      const rawLocation = sessionStorage.getItem("locationPermissionResult");
+      if (!rawLocation) return;
+
+      const location = JSON.parse(rawLocation);
+      if (!location.allowed || !navigator.geolocation || locationWatchId !== null) return;
+
+      locationWatchId = navigator.geolocation.watchPosition(
+        (position) => {
+          locationStatusElement.textContent =
+            `Location aktiv: ${position.coords.latitude}, ${position.coords.longitude} (Genauigkeit: ${Math.round(position.coords.accuracy)} m)`;
+        },
+        () => {
+          locationStatusElement.textContent = "Location war erlaubt, ist aktuell aber nicht abrufbar.";
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 15000
+        }
+      );
+    }
+
+    async function startCameraIfPossible() {
+      if (cameraStarted) return;
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        cameraStatusElement.textContent = "Kamera wird von diesem Browser nicht unterstützt.";
+        return;
+      }
+
+      try {
+        cameraStatusElement.textContent = "Kamera-Zugriff wird angefragt...";
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+
+        cameraPreviewElement.srcObject = stream;
+        cameraStarted = true;
+        cameraStatusElement.textContent = "Kamera ist aktiv.";
+      } catch (error) {
+        cameraStatusElement.textContent = "Kamera noch nicht freigegeben. Es wird weiter geprüft...";
+      }
+    }
+
+    async function observePermissionChanges() {
+      if (!navigator.permissions?.query) return;
+
+      try {
+        const cameraPermission = await navigator.permissions.query({ name: "camera" });
+
+        cameraPermission.onchange = () => {
+          if (cameraPermission.state === "granted") {
+            startCameraIfPossible();
+          }
+        };
+      } catch {
+        // Einige Browser unterstützen camera in der Permissions API nicht vollständig.
+      }
+    }
+
+    function startAutoLoop() {
+      startCameraIfPossible();
+
+      setInterval(() => {
+        startCameraIfPossible();
+      }, 3000);
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      renderSavedLocation();
+      startLocationWatcherIfAllowed();
+      observePermissionChanges();
+      startAutoLoop();
+    });
+
+  </script>
+</body>
+</html>
