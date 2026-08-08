@@ -1,4 +1,11 @@
 #!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")"
+
+if [ ! -f "certs/rootCA.crt" ]; then
+  echo "certs/rootCA.crt wurde nicht gefunden. Bitte zuerst certs/build_cert_chain.sh ausfuehren." >&2
+  exit 1
+fi
 
 sudo security add-trusted-cert \
   -d \

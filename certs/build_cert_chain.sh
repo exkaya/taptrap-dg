@@ -1,6 +1,10 @@
 #!/bin/bash
+set -euo pipefail
 
-# Sollte im Ordner ausgefuehrt werden wo man auch die Zertifikate auch haben moechte.
+command -v openssl >/dev/null || { echo "openssl wurde nicht gefunden. Bitte installieren." >&2; exit 1; }
+
+# Ablage immer im certs-Ordner, unabhaengig davon von wo das Skript aufgerufen wird.
+cd "$(dirname "$0")"
 
 echo "Erstelle Root CA's private key"
 openssl genrsa -out rootCA.key 4096
