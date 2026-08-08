@@ -35,7 +35,14 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 Skripte, die Änderungen am System vornehmen (Zertifikatsspeicher), müssen zusätzlich **als Administrator** ausgeführt werden — das ist beim jeweiligen Schritt unten vermerkt.
 
-Für jeden Schritt gibt es zwei gleichwertige Skript-Varianten im Repository: `name.sh` für macOS/Linux (Terminal) und `name.ps1` für Windows (PowerShell). Windows-Skripte startet man mit vorangestelltem `.\`, z. B. `.\build_webserver.ps1`.
+Alle Schritte unten werden über eines von zwei Setup-Skripten ausgeführt: `setup.sh` für macOS/Linux (Terminal) und `setup.ps1` für Windows (PowerShell). Windows-Skripte startet man mit vorangestelltem `.\`, z. B. `.\setup.ps1`.
+
+Beide Skripte lassen sich auf zwei Arten nutzen:
+
+- **Interaktiv:** einfach ohne Argumente aufrufen (`./setup.sh` bzw. `.\setup.ps1`) — es erscheint ein Menü, aus dem der gewünschte Schritt per Nummer oder Name ausgewählt wird.
+- **Direkt:** mit dem Schrittnamen als Argument, z. B. `./setup.sh certs` bzw. `.\setup.ps1 certs`. So lassen sich Schritte auch aus eigenen Skripten heraus automatisieren.
+
+Die verfügbaren Schritte sind `certs`, `trust`, `build`, `run`, `load-ca`, `german` und `all` (führt `certs`, `trust` und `build` nacheinander aus) — sie entsprechen genau den Schritten 2–6 weiter unten.
 
 ## Schritt-für-Schritt-Anleitung
 
@@ -51,16 +58,16 @@ Für die Einrichtung von Android Studio sowie den benötigten `sdkmanager` und `
 
 *Warum?* Damit der Emulator die eigene Webseite über HTTPS ohne Warnung/Fehler laden kann, braucht der Webserver ein Zertifikat. Da es keine öffentliche Domain gibt, wird eine eigene, kleine Zertifizierungsstelle ("Root CA") erstellt, die anschließend ein Server-Zertifikat für `localhost` signiert.
 
-Das Skript legt die Dateien direkt im Ordner `certs/` ab (das Verzeichnis, in dem es liegt) und muss **einmalig** ausgeführt werden. Die erzeugten Dateien (`*.key`, `*.crt`, …) sind bewusst in `.gitignore` eingetragen und werden nicht ins Repository übernommen.
+Die Dateien landen direkt im Ordner `certs/` und müssen **einmalig** erzeugt werden. Sie sind bewusst in `.gitignore` eingetragen und werden nicht ins Repository übernommen.
 
 **macOS:**
 ```bash
-./certs/build_cert_chain.sh
+./setup.sh certs
 ```
 
 **Windows:**
 ```powershell
-.\certs\build_cert_chain.ps1
+.\setup.ps1 certs
 ```
 
 Am Ende sollte die Zeile `server.crt: OK` erscheinen. Erscheint sie nicht, stimmt etwas mit der Zertifikatskette nicht — in diesem Fall nicht mit den nächsten Schritten fortfahren, sondern den Fehler oben in der Ausgabe suchen.
@@ -71,13 +78,15 @@ Am Ende sollte die Zeile `server.crt: OK` erscheinen. Erscheint sie nicht, stimm
 
 **macOS** (fragt nach dem Login-Passwort):
 ```bash
-./mac_make_rootca_trusted.sh
+./setup.sh trust
 ```
 
 **Windows** (PowerShell **als Administrator** öffnen, dann):
 ```powershell
-.\windows_make_rootca_trusted.ps1
+.\setup.ps1 trust
 ```
+
+Unter Linux gibt es keinen einheitlichen System-Zertifikatsspeicher — hier zeigt der Schritt nur den Pfad zu `certs/rootCA.crt` an, der manuell importiert werden muss.
 
 ### 4. Webserver bauen und starten
 
@@ -87,14 +96,14 @@ Docker Desktop muss vorher gestartet sein.
 
 **macOS:**
 ```bash
-./build_webserver.sh
-./run_webserver.sh
+./setup.sh build
+./setup.sh run
 ```
 
 **Windows:**
 ```powershell
-.\build_webserver.ps1
-.\run_webserver.ps1
+.\setup.ps1 build
+.\setup.ps1 run
 ```
 
 Der Webserver läuft anschließend erreichbar unter `https://localhost:5002` und im Emulator unter `https://10.0.2.2:5002` (das ist die Adresse, unter der der Emulator den Host-Rechner erreicht). Zum Beenden reicht `Strg+C` im selben Terminal-Fenster.
@@ -107,12 +116,12 @@ Emulator muss laufen, bevor dieser Schritt ausgeführt wird.
 
 **macOS:**
 ```bash
-./load_rootca_to_emulator.sh
+./setup.sh load-ca
 ```
 
 **Windows:**
 ```powershell
-.\load_rootca_to_emulator.ps1
+.\setup.ps1 load-ca
 ```
 
 Das Skript kopiert das Zertifikat in den Download-Ordner des Emulators und zeigt an, wo es im Emulator manuell importiert werden muss: **Einstellungen → Suchleiste → "Zertifikate installieren" → Datei aus dem Download-Ordner wählen.**
@@ -125,15 +134,15 @@ Nur nötig, wenn die Demo auf Deutsch laufen soll und **Google APIs** (nicht Pla
 
 **macOS:**
 ```bash
-./make_emulator_german.sh
+./setup.sh german
 ```
 
 **Windows:**
 ```powershell
-.\make_emulator_german.ps1
+.\setup.ps1 german
 ```
 
-Das Skript findet den laufenden Emulator automatisch. Laufen mehrere Emulatoren gleichzeitig, kann die Seriennummer explizit angegeben werden, z. B. `./make_emulator_german.sh emulator-5556` bzw. `.\make_emulator_german.ps1 -Serial emulator-5556` (Seriennummer mit `adb devices` herausfinden).
+Das Skript findet den laufenden Emulator automatisch. Laufen mehrere Emulatoren gleichzeitig, kann die Seriennummer explizit angegeben werden, z. B. `./setup.sh german emulator-5556` bzw. `.\setup.ps1 german emulator-5556` (Seriennummer mit `adb devices` herausfinden).
 
 ### 7. App testen
 
@@ -166,6 +175,6 @@ Für den eigenen, lokalen Webserver aus Schritt 4 den Wert von `webapp` auf `htt
 
 ## Entwicklung
 
-Für alle `.sh`-Skripte gilt, dass das Recht zur Ausführung erteilt werden muss (`chmod +x <skript>`) — im Repository ist das bereits gesetzt. Siehe die Kommentare in den Skripten für weitere Details.
+Die gesamte Setup-Logik steckt in genau zwei Dateien: `setup.sh` (macOS/Linux) und `setup.ps1` (Windows). Beide bilden dieselben sieben Schritte (`certs`, `trust`, `build`, `run`, `load-ca`, `german`, `all`) als Funktionen ab, die entweder über das interaktive Menü oder direkt per Argument aufgerufen werden. Wer einen Schritt ändert oder einen neuen hinzufügt, sollte das jeweils in beiden Dateien tun, damit macOS/Linux und Windows im Funktionsumfang gleichauf bleiben.
 
-Für jedes `.sh`-Skript existiert ein gleichwertiges `.ps1`-Gegenstück für Windows (Ausnahme: `mac_make_rootca_trusted.sh` und `windows_make_rootca_trusted.ps1`, da das Vertrauen von Zertifikaten pro Betriebssystem grundlegend unterschiedlich funktioniert). Wer eines der Skripte ändert, sollte das Gegenstück auf der anderen Plattform entsprechend nachziehen.
+`setup.sh` benötigt das Ausführungsrecht (`chmod +x setup.sh`) — im Repository ist das bereits gesetzt.
