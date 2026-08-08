@@ -2,7 +2,7 @@
 
 Dies ist der offizielle Deployment Guide von Taptrap. Er dient als Grundlage und Ergänzung dafür, wie man Taptrap auf einem Pixel-6a-Emulator simulieren kann, um Zugriffsrechte zu erhalten, ohne dass der Benutzer etwas von der Prozedur mitbekommt. Zusätzlich werden Skripte bereitgestellt, welche die Analysen ermöglichen. Dieses Repository soll somit als Ergänzung zur Hausarbeit dienen, sodass interessierten Lesern eine leichtere Nachbildung der Experimente möglich ist.
 
-Diese Anleitung richtet sich auch an Leser ohne viel Vorerfahrung mit Kommandozeile, Docker oder Android-Entwicklung — jeder Schritt wird kurz erklärt, bevor der eigentliche Befehl kommt. Die Anleitung deckt **macOS** und **Windows** ab; für Linux funktionieren die `.sh`-Skripte in der Regel unverändert, wurden aber nicht getestet.
+Diese Anleitung richtet sich auch an Leser ohne viel Vorerfahrung mit Kommandozeile, Docker oder Android-Entwicklung — jeder Schritt wird kurz erklärt, bevor der eigentliche Befehl kommt. Die Anleitung deckt **macOS** (Intel & Apple Silicon), **Ubuntu/Debian** und **Fedora/RHEL** über `setup.sh` sowie **Windows** über `setup.ps1` ab. Andere Linux-Distributionen funktionieren beim Webserver/Emulator-Teil in der Regel ebenfalls, beim Schritt `trust` (Root-Zertifikat vertrauen) muss dort aber manuell nachgeholfen werden.
 
 ## Was passiert hier eigentlich?
 
@@ -86,7 +86,7 @@ Am Ende sollte die Zeile `server.crt: OK` erscheinen. Erscheint sie nicht, stimm
 .\setup.ps1 trust
 ```
 
-Unter Linux gibt es keinen einheitlichen System-Zertifikatsspeicher — hier zeigt der Schritt nur den Pfad zu `certs/rootCA.crt` an, der manuell importiert werden muss.
+Unter Linux wird sowohl Ubuntu/Debian (`update-ca-certificates`) als auch Fedora/RHEL (`update-ca-trust`) unterstützt; das passende Werkzeug wird automatisch erkannt. Bei anderen Distributionen muss `certs/rootCA.crt` manuell in den System-Zertifikatsspeicher importiert werden.
 
 ### 4. Webserver bauen und starten
 

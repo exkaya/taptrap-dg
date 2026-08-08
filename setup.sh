@@ -92,9 +92,18 @@ step_trust() {
       sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$CERT_DIR/rootCA.crt"
       ;;
     Linux)
-      echo "Automatisches Vertrauen wird unter Linux nicht unterstuetzt (Zertifikatsspeicher unterscheidet sich je Distribution)."
-      echo "Root-Zertifikat manuell importieren: $CERT_DIR/rootCA.crt"
-      return 1
+      if command -v update-ca-certificates >/dev/null 2>&1; then
+        # Debian/Ubuntu
+        sudo cp "$CERT_DIR/rootCA.crt" /usr/local/share/ca-certificates/taptrap-rootCA.crt
+        sudo update-ca-certificates
+      elif command -v update-ca-trust >/dev/null 2>&1; then
+        # Fedora/RHEL
+        sudo cp "$CERT_DIR/rootCA.crt" /etc/pki/ca-trust/source/anchors/taptrap-rootCA.crt
+        sudo update-ca-trust
+      else
+        echo "Fehler: Weder update-ca-certificates noch update-ca-trust gefunden. Root-Zertifikat manuell importieren: $CERT_DIR/rootCA.crt" >&2
+        return 1
+      fi
       ;;
     *)
       echo "Fehler: Unbekanntes Betriebssystem $(uname -s)." >&2
@@ -176,7 +185,7 @@ print_menu() {
 TapTrap Setup (macOS/Linux)
 ============================
  1) certs    TLS-Zertifikate erzeugen (einmalig)
- 2) trust    Root-Zertifikat auf diesem Rechner vertrauen (macOS)
+ 2) trust    Root-Zertifikat auf diesem Rechner vertrauen
  3) build    Webserver-Docker-Image bauen
  4) run      Webserver starten (blockierend, Strg+C zum Beenden)
  5) load-ca  Root-Zertifikat auf den Emulator laden
