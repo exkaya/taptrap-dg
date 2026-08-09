@@ -1,6 +1,6 @@
 #!/bin/bash
 # Interactive setup helper for macOS/Linux. Run without arguments for a menu,
-# or pass a step name directly, e.g. `./setup.sh certs` or `./setup.sh german emulator-5556`.
+# or pass a step name directly, e.g. `./setup.sh certs` or `./setup.sh transparency hide`.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -11,6 +11,20 @@ need() {
     echo "Fehler: '$1' wurde nicht gefunden. $2" >&2
     return 1
   fi
+}
+
+# Docker Desktop on macOS ships its credential helper (docker-credential-desktop)
+# under Docker.app instead of installing it into PATH. Without it, every `docker`
+# command that touches a registry fails with "docker-credential-desktop not found",
+# even for public images. Add it to PATH if it's missing but present locally.
+fix_docker_creds_path() {
+  command -v docker-credential-desktop >/dev/null 2>&1 && return 0
+  for d in "/Applications/Docker.app/Contents/Resources/bin" "$HOME/.docker/bin"; do
+    if [ -x "$d/docker-credential-desktop" ]; then
+      export PATH="$d:$PATH"
+      return 0
+    fi
+  done
 }
 
 step_certs() {
@@ -114,11 +128,13 @@ step_trust() {
 
 step_build() {
   need docker "Bitte Docker Desktop installieren und starten." || return 1
+  fix_docker_creds_path
   docker build -t tt-site ./malicious-website
 }
 
 step_run() {
   need docker "Bitte Docker Desktop installieren und starten." || return 1
+  fix_docker_creds_path
   if [ ! -f "$CERT_DIR/server.crt" ] || [ ! -f "$CERT_DIR/server.key" ]; then
     echo "Fehler: Zertifikate fehlen. Zuerst Schritt 'certs' ausfuehren." >&2
     return 1
@@ -147,19 +163,75 @@ step_load_ca() {
   echo "rootCA aus dem Download Ordner einfuegen"
 }
 
-step_german() {
-  need adb "Bitte den Android SDK platform-tools Ordner zum PATH hinzufuegen." || return 1
-  local serial="${1:-$(adb devices | awk '/^emulator-/{print $1; exit}')}"
-  if [ -z "$serial" ]; then
-    echo "Fehler: Kein laufender Emulator gefunden. Bitte zuerst den Emulator in Android Studio starten." >&2
-    return 1
+# Animation-Ressourcen, die den echten System-Dialog waehrend des Exploits per
+# fixem Alpha-Wert verdecken (siehe KillTheBugs/app/src/main/java/.../LevelActivity.kt,
+# exploitCustomTab/exploitDeviceManager). Fuer Vorfuehrungen laesst sich dieser Wert
+# hier umschalten, ohne die XML-Dateien manuell zu editieren.
+TRANSPARENCY_ANIM_DIR="KillTheBugs/app/src/main/res/anim"
+TRANSPARENCY_ANIM_FILES=(
+  fade_in_ct_location.xml
+  fade_in_ct_location_admin.xml
+  fade_in_ct_camera.xml
+  fade_in_ct_camera_admin.xml
+  fade_in_dmp.xml
+  fade_in_dmp_admin.xml
+)
+
+# "hide" ist bewusst nicht 0.0: der Systemdialog soll fuer den echten Angriff
+# fuer das menschliche Auge quasi unsichtbar bleiben, aber technisch vorhanden.
+TRANSPARENCY_HIDE_ALPHA="0.02"
+TRANSPARENCY_SHOW_ALPHA="1.0"
+
+step_transparency() {
+  local mode="${1:-}"
+
+  if [ -z "$mode" ]; then
+    echo "Aktuelle Deckkraft (Alpha) der Tarn-Animationen:"
+    for f in "${TRANSPARENCY_ANIM_FILES[@]}"; do
+      local path="$TRANSPARENCY_ANIM_DIR/$f"
+      if [ -f "$path" ]; then
+        local alpha
+        alpha="$(grep -m1 -o 'android:fromAlpha="[0-9.]*"' "$path" | grep -o '[0-9.]*')"
+        echo "  $f: $alpha"
+      fi
+    done
+    echo ""
+    echo "Verwendung: ./setup.sh transparency <show|hide>"
+    echo "  show  Voll sichtbar (alpha=$TRANSPARENCY_SHOW_ALPHA) - zeigt dem Publikum den echten Systemdialog im Hintergrund"
+    echo "  hide  Fuer das Auge quasi unsichtbar (alpha=$TRANSPARENCY_HIDE_ALPHA) - wie im echten, verdeckten Angriff"
+    return 0
   fi
-  echo "Verwende Emulator: $serial"
-  adb -s "$serial" root
-  adb -s "$serial" wait-for-device
-  adb -s "$serial" shell "setprop persist.sys.locale de-DE; stop; sleep 5; start"
-  adb -s "$serial" wait-for-device
-  adb -s "$serial" shell getprop persist.sys.locale
+
+  local value
+  case "$mode" in
+    show) value="$TRANSPARENCY_SHOW_ALPHA" ;;
+    hide) value="$TRANSPARENCY_HIDE_ALPHA" ;;
+    *)
+      echo "Fehler: Unbekannter Modus '$mode'. Erlaubt: 'show' oder 'hide'." >&2
+      return 1
+      ;;
+  esac
+
+  for f in "${TRANSPARENCY_ANIM_FILES[@]}"; do
+    local path="$TRANSPARENCY_ANIM_DIR/$f"
+    if [ ! -f "$path" ]; then
+      echo "Warnung: $path nicht gefunden, ueberspringe." >&2
+      continue
+    fi
+    case "$(uname -s)" in
+      Darwin)
+        sed -i '' -E "s/android:fromAlpha=\"[0-9.]+\"/android:fromAlpha=\"$value\"/; s/android:toAlpha=\"[0-9.]+\"/android:toAlpha=\"$value\"/" "$path"
+        ;;
+      *)
+        sed -i -E "s/android:fromAlpha=\"[0-9.]+\"/android:fromAlpha=\"$value\"/; s/android:toAlpha=\"[0-9.]+\"/android:toAlpha=\"$value\"/" "$path"
+        ;;
+    esac
+    echo "Aktualisiert: $f -> alpha=$value"
+  done
+
+  echo ""
+  echo "Hinweis: Die KillTheBugs-App muss neu gebaut und auf dem Emulator installiert werden,"
+  echo "damit die Aenderung sichtbar wird (Android Studio: Run, oder 'cd KillTheBugs && ./gradlew installDebug')."
 }
 
 step_all() {
@@ -173,7 +245,7 @@ run_step() {
     3|build)   step_build ;;
     4|run)     step_run ;;
     5|load-ca) step_load_ca ;;
-    6|german)  shift; step_german "${1:-}" ;;
+    6|transparency) shift; step_transparency "${1:-}" ;;
     7|all)     step_all ;;
     *) echo "Unbekannter Schritt: $1" >&2; return 1 ;;
   esac
@@ -184,14 +256,14 @@ print_menu() {
 
 TapTrap Setup (macOS/Linux)
 ============================
- 1) certs    TLS-Zertifikate erzeugen (einmalig)
- 2) trust    Root-Zertifikat auf diesem Rechner vertrauen
- 3) build    Webserver-Docker-Image bauen
- 4) run      Webserver starten (blockierend, Strg+C zum Beenden)
- 5) load-ca  Root-Zertifikat auf den Emulator laden
- 6) german   Emulator-Sprache auf Deutsch stellen
- 7) all      Schritte 1-3 nacheinander ausfuehren
- 0) exit     Beenden
+ 1) certs        TLS-Zertifikate erzeugen (einmalig)
+ 2) trust        Root-Zertifikat auf diesem Rechner vertrauen
+ 3) build        Webserver-Docker-Image bauen
+ 4) run          Webserver starten (blockierend, Strg+C zum Beenden)
+ 5) load-ca      Root-Zertifikat auf den Emulator laden
+ 6) transparency Deckkraft der Tarn-Animation fuer Demo-Zwecke anpassen
+ 7) all          Schritte 1-3 nacheinander ausfuehren
+ 0) exit         Beenden
 EOF
 }
 

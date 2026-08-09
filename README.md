@@ -6,11 +6,10 @@ Diese Anleitung richtet sich auch an Leser ohne viel Vorerfahrung mit Kommandoze
 
 ## Was passiert hier eigentlich?
 
-Für die Demo werden drei Dinge gebraucht:
+Für die Demo werden zwei Dinge gebraucht:
 
 1. Ein **Android-Emulator**, auf dem die präparierte App installiert wird.
 2. Ein **eigener Webserver mit HTTPS**, der die Webseite bereitstellt, die als Vorwand für den Angriff dient. Android verweigert ohne gültiges HTTPS-Zertifikat den Zugriff auf die Seite, deshalb muss ein eigenes Zertifikat erzeugt und sowohl dem eigenen Rechner als auch dem Emulator "beigebracht" werden, dass es vertrauenswürdig ist.
-3. Optional: eine auf **Deutsch** umgestellte Systemsprache im Emulator, damit die Demo auf Deutsch abläuft.
 
 Die folgenden Schritte bauen aufeinander auf und sollten in dieser Reihenfolge ausgeführt werden.
 
@@ -42,15 +41,13 @@ Beide Skripte lassen sich auf zwei Arten nutzen:
 - **Interaktiv:** einfach ohne Argumente aufrufen (`./setup.sh` bzw. `.\setup.ps1`) — es erscheint ein Menü, aus dem der gewünschte Schritt per Nummer oder Name ausgewählt wird.
 - **Direkt:** mit dem Schrittnamen als Argument, z. B. `./setup.sh certs` bzw. `.\setup.ps1 certs`. So lassen sich Schritte auch aus eigenen Skripten heraus automatisieren.
 
-Die verfügbaren Schritte sind `certs`, `trust`, `build`, `run`, `load-ca`, `german` und `all` (führt `certs`, `trust` und `build` nacheinander aus) — sie entsprechen genau den Schritten 2–6 weiter unten.
+Die verfügbaren Schritte sind `certs`, `trust`, `build`, `run`, `load-ca`, `transparency` und `all` (führt `certs`, `trust` und `build` nacheinander aus) — sie entsprechen den Schritten 2–5 und 7 weiter unten (Schritt 6 "App testen" erfolgt manuell in Android Studio und hat keinen eigenen Setup-Schritt). `transparency` gibt es aktuell nur unter `setup.sh` (macOS/Linux).
 
 ## Schritt-für-Schritt-Anleitung
 
 ### 1. Android Studio & Emulator einrichten
 
 Als Emulator sollte ein **Pixel 6a** mit **Android 15** (API Level 35, "VanillaIceCream") und **Google APIs** als Services gewählt werden.
-
-Wählt man stattdessen den Google Play Store als Service, lässt sich die Systemsprache später nicht mehr per `adb` automatisieren (siehe Schritt 5). Ansonsten hat die Wahl keine weitere Bedeutung.
 
 Für die Einrichtung von Android Studio sowie den benötigten `sdkmanager` und `cmdline-tools` sei auf das Referenz-Repository [beerphilipp/taptrap](https://github.com/beerphilipp/taptrap) verwiesen. Startet den Emulator, bevor ihr mit Schritt 5 fortfahrt.
 
@@ -128,23 +125,7 @@ Das Skript kopiert das Zertifikat in den Download-Ordner des Emulators und zeigt
 
 Wird der Emulator zurückgesetzt (z. B. über "Wipe Data"), geht der Import verloren und dieser Schritt muss wiederholt werden.
 
-### 6. (Optional) Emulator-Sprache auf Deutsch stellen
-
-Nur nötig, wenn die Demo auf Deutsch laufen soll und **Google APIs** (nicht Play Store) als Emulator-Service gewählt wurde (siehe Schritt 1).
-
-**macOS:**
-```bash
-./setup.sh german
-```
-
-**Windows:**
-```powershell
-.\setup.ps1 german
-```
-
-Das Skript findet den laufenden Emulator automatisch. Laufen mehrere Emulatoren gleichzeitig, kann die Seriennummer explizit angegeben werden, z. B. `./setup.sh german emulator-5556` bzw. `.\setup.ps1 german emulator-5556` (Seriennummer mit `adb devices` herausfinden).
-
-### 7. App testen
+### 6. App testen
 
 Sobald der Webserver läuft (Schritt 4) und der Emulator dem Zertifikat vertraut (Schritt 5), kann die App aus Android Studio auf den Emulator installiert und die Demo durchlaufen werden. Die Ziel-URL ist in
 
@@ -165,6 +146,21 @@ hinterlegt:
 
 Für den eigenen, lokalen Webserver aus Schritt 4 den Wert von `webapp` auf `https://10.0.2.2:5002` ändern. Das ist praktisch, wenn man den Emulator häufiger zurücksetzt und die Demo ohne den öffentlichen Server erneut sauber durchlaufen lassen möchte. Danach wieder zurück auf `https://killthebugs.taptrap.click/` wechseln, sobald man mit den Ergebnissen zufrieden ist.
 
+### 7. (Optional) Deckkraft der Tarn-Animation umschalten
+
+*Warum?* Während des Exploits (3. Punkt in jedem Level) wird der echte System-Dialog (Custom-Tab-Berechtigungsabfrage bzw. "Als Geräteadministrator aktivieren") über eine Android-Animation stark gezoomt eingeblendet und mit einem festen Alpha-Wert überlagert, damit er wie ein Teil des Spiels aussieht ([`LevelActivity.kt`](KillTheBugs/app/src/main/java/com/taptrap/userstudy/killthebugs/LevelActivity.kt), `exploitCustomTab`/`exploitDeviceManager`, sowie die `res/anim/fade_in_*`-Dateien). Für Vorführungen ist es hilfreich, kurz sichtbar zu machen, was tatsächlich im Hintergrund passiert, und danach wieder auf den unauffälligen Wert für den echten Angriff zurückzuschalten.
+
+**macOS/Linux:**
+```bash
+./setup.sh transparency show   # voll sichtbar (alpha=1.0) – für Vorführungen
+./setup.sh transparency hide   # für das Auge quasi unsichtbar (alpha=0.02) – wie im echten Angriff
+./setup.sh transparency        # zeigt die aktuell gesetzten Werte an
+```
+
+Das Skript patcht die `android:fromAlpha`/`android:toAlpha`-Werte in allen sechs betroffenen `res/anim/fade_in_*.xml`-Dateien. Nach dem Umschalten muss die KillTheBugs-App neu gebaut und auf dem Emulator installiert werden (Android Studio: **Run**, oder `cd KillTheBugs && ./gradlew installDebug`), damit die Änderung sichtbar wird — das Setup-Skript baut die Android-App selbst nicht.
+
+Dieser Schritt existiert aktuell nur unter `setup.sh` (macOS/Linux), nicht unter `setup.ps1`.
+
 ## Fehlerbehebung
 
 - **"docker: command not found" / "Cannot connect to the Docker daemon"** — Docker Desktop ist nicht installiert oder nicht gestartet.
@@ -175,6 +171,6 @@ Für den eigenen, lokalen Webserver aus Schritt 4 den Wert von `webapp` auf `htt
 
 ## Entwicklung
 
-Die gesamte Setup-Logik steckt in genau zwei Dateien: `setup.sh` (macOS/Linux) und `setup.ps1` (Windows). Beide bilden dieselben sieben Schritte (`certs`, `trust`, `build`, `run`, `load-ca`, `german`, `all`) als Funktionen ab, die entweder über das interaktive Menü oder direkt per Argument aufgerufen werden. Wer einen Schritt ändert oder einen neuen hinzufügt, sollte das jeweils in beiden Dateien tun, damit macOS/Linux und Windows im Funktionsumfang gleichauf bleiben.
+Die gesamte Setup-Logik steckt in genau zwei Dateien: `setup.sh` (macOS/Linux) und `setup.ps1` (Windows). Beide bilden dieselben sechs Kern-Schritte (`certs`, `trust`, `build`, `run`, `load-ca`, `all`) als Funktionen ab, die entweder über das interaktive Menü oder direkt per Argument aufgerufen werden. Wer einen dieser Schritte ändert oder einen neuen hinzufügt, sollte das jeweils in beiden Dateien tun, damit macOS/Linux und Windows im Funktionsumfang gleichauf bleiben. `setup.sh` bietet zusätzlich den Schritt `transparency` (siehe Abschnitt 7 oben), der bewusst nur für macOS/Linux existiert.
 
 `setup.sh` benötigt das Ausführungsrecht (`chmod +x setup.sh`) — im Repository ist das bereits gesetzt.

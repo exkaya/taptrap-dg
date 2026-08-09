@@ -1,13 +1,10 @@
 <#
 Interactive setup helper for Windows. Run without arguments for a menu,
-or pass a step name directly, e.g. .\setup.ps1 certs or .\setup.ps1 german emulator-5556
+or pass a step name directly, e.g. .\setup.ps1 certs
 #>
 param(
     [Parameter(Position = 0)]
-    [string]$Step,
-
-    [Parameter(Position = 1)]
-    [string]$Serial
+    [string]$Step
 )
 
 $ErrorActionPreference = "Stop"
@@ -155,24 +152,6 @@ function Step-LoadCA {
     Write-Host "rootCA aus dem Download Ordner einfuegen"
 }
 
-function Step-German {
-    param([string]$Serial)
-    Test-Cmd adb "Bitte den Android SDK platform-tools Ordner zum PATH hinzufuegen."
-    if (-not $Serial) {
-        $match = adb devices | Select-String '^emulator-\S+' | Select-Object -First 1
-        if ($match) { $Serial = ($match.Line -split '\s+')[0] }
-    }
-    if (-not $Serial) {
-        throw "Kein laufender Emulator gefunden. Bitte zuerst den Emulator in Android Studio starten."
-    }
-    Write-Host "Verwende Emulator: $Serial"
-    Invoke-Native adb -s $Serial root
-    Invoke-Native adb -s $Serial wait-for-device
-    Invoke-Native adb -s $Serial shell "setprop persist.sys.locale de-DE; stop; sleep 5; start"
-    Invoke-Native adb -s $Serial wait-for-device
-    Invoke-Native adb -s $Serial shell getprop persist.sys.locale
-}
-
 function Step-All {
     Step-Certs
     Step-Trust
@@ -181,18 +160,17 @@ function Step-All {
 
 $StepMap = @{
     '1' = 'certs'; '2' = 'trust'; '3' = 'build'
-    '4' = 'run'; '5' = 'load-ca'; '6' = 'german'; '7' = 'all'
+    '4' = 'run'; '5' = 'load-ca'; '6' = 'all'
 }
 
 function Invoke-Step {
-    param([string]$Name, [string]$Serial)
+    param([string]$Name)
     switch ($Name) {
         'certs'   { Step-Certs }
         'trust'   { Step-Trust }
         'build'   { Step-Build }
         'run'     { Step-Run }
         'load-ca' { Step-LoadCA }
-        'german'  { Step-German -Serial $Serial }
         'all'     { Step-All }
         default   { throw "Unbekannter Schritt: $Name" }
     }
@@ -207,15 +185,14 @@ function Show-Menu {
     Write-Host " 3) build    Webserver-Docker-Image bauen"
     Write-Host " 4) run      Webserver starten (blockierend, Strg+C zum Beenden)"
     Write-Host " 5) load-ca  Root-Zertifikat auf den Emulator laden"
-    Write-Host " 6) german   Emulator-Sprache auf Deutsch stellen"
-    Write-Host " 7) all      Schritte 1-3 nacheinander ausfuehren"
+    Write-Host " 6) all      Schritte 1-3 nacheinander ausfuehren"
     Write-Host " 0) exit     Beenden"
 }
 
-# Nicht-interaktiv: .\setup.ps1 <schritt> [seriennummer]
+# Nicht-interaktiv: .\setup.ps1 <schritt>
 if ($Step) {
     $resolved = if ($StepMap.ContainsKey($Step)) { $StepMap[$Step] } else { $Step }
-    Invoke-Step -Name $resolved -Serial $Serial
+    Invoke-Step -Name $resolved
     exit 0
 }
 
@@ -226,7 +203,7 @@ while ($true) {
     if ($choice -eq '0' -or $choice -eq 'exit') { break }
     $resolved = if ($StepMap.ContainsKey($choice)) { $StepMap[$choice] } else { $choice }
     try {
-        Invoke-Step -Name $resolved -Serial $null
+        Invoke-Step -Name $resolved
     }
     catch {
         Write-Warning $_.Exception.Message
