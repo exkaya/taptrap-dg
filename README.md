@@ -41,7 +41,7 @@ Beide Skripte lassen sich auf zwei Arten nutzen:
 - **Interaktiv:** einfach ohne Argumente aufrufen (`./setup.sh` bzw. `.\setup.ps1`) — es erscheint ein Menü, aus dem der gewünschte Schritt per Nummer oder Name ausgewählt wird.
 - **Direkt:** mit dem Schrittnamen als Argument, z. B. `./setup.sh certs` bzw. `.\setup.ps1 certs`. So lassen sich Schritte auch aus eigenen Skripten heraus automatisieren.
 
-Die verfügbaren Schritte sind `certs`, `trust`, `build`, `run`, `load-ca`, `transparency` und `all` (führt `certs`, `trust` und `build` nacheinander aus) — sie entsprechen den Schritten 2–5 und 7 weiter unten (Schritt 6 "App testen" erfolgt manuell in Android Studio und hat keinen eigenen Setup-Schritt). `transparency` gibt es aktuell nur unter `setup.sh` (macOS/Linux).
+Die verfügbaren Schritte sind `certs`, `trust`, `build`, `run`, `load-ca` und `all` (führt `certs`, `trust` und `build` nacheinander aus) — sie entsprechen den Schritten 2, 3, 4 und 6 weiter unten. Dazu kommen die optionalen Zusatzschritte `wipe-data` (Schritt 5), `check-permissions` (Schritt 8), `transparency` (Schritt 9) und `webapp` (Schritt 10), die es aktuell nur unter `setup.sh` (macOS/Linux) gibt. Schritt 7 "App testen" erfolgt manuell in Android Studio und hat keinen eigenen Setup-Schritt.
 
 ## Schritt-für-Schritt-Anleitung
 
@@ -49,7 +49,7 @@ Die verfügbaren Schritte sind `certs`, `trust`, `build`, `run`, `load-ca`, `tra
 
 Als Emulator sollte ein **Pixel 6a** mit **Android 15** (API Level 35, "VanillaIceCream") und **Google APIs** als Services gewählt werden.
 
-Für die Einrichtung von Android Studio sowie den benötigten `sdkmanager` und `cmdline-tools` sei auf das Referenz-Repository [beerphilipp/taptrap](https://github.com/beerphilipp/taptrap) verwiesen. Startet den Emulator, bevor ihr mit Schritt 5 fortfahrt.
+Für die Einrichtung von Android Studio sowie den benötigten `sdkmanager` und `cmdline-tools` sei auf das Referenz-Repository [beerphilipp/taptrap](https://github.com/beerphilipp/taptrap) verwiesen. Startet den Emulator, bevor ihr mit den emulatorbezogenen Schritten (ab Schritt 5) fortfahrt.
 
 ### 2. TLS-Zertifikate erzeugen
 
@@ -105,7 +105,20 @@ Docker Desktop muss vorher gestartet sein.
 
 Der Webserver läuft anschließend erreichbar unter `https://localhost:5002` und im Emulator unter `https://10.0.2.2:5002` (das ist die Adresse, unter der der Emulator den Host-Rechner erreicht). Zum Beenden reicht `Strg+C` im selben Terminal-Fenster.
 
-### 5. Root-Zertifikat auf den Emulator laden
+### 5. (Optional) Emulator auf Werkszustand zurücksetzen
+
+*Warum?* Für einen wiederholt sauberen Demo-Durchlauf (keine alte App-Installation, kein alter Zertifikats- oder Geräteadmin-Status) lässt sich der Emulator per Skript zurücksetzen, statt das in Android Studio manuell über "Wipe Data" zu machen.
+
+**macOS/Linux:**
+```bash
+./setup.sh wipe-data
+```
+
+Das Skript fragt zur Sicherheit nach Bestätigung (mit `./setup.sh wipe-data yes` überspringen), stoppt den laufenden Emulator und startet ihn mit `-wipe-data` neu. Der Neustart läuft im Hintergrund; mit `adb wait-for-device` oder im Android-Studio-Fenster lässt sich der Bootvorgang abwarten. Danach müssen `load-ca` (Schritt 6) und die App-Installation (Schritt 7) erneut ausgeführt werden.
+
+Dieser Schritt existiert aktuell nur unter `setup.sh` (macOS/Linux), nicht unter `setup.ps1`.
+
+### 6. Root-Zertifikat auf den Emulator laden
 
 *Warum?* Auch der Emulator selbst muss der Root CA vertrauen, sonst blockiert Android die HTTPS-Verbindung zur eigenen Webseite.
 
@@ -121,38 +134,45 @@ Emulator muss laufen, bevor dieser Schritt ausgeführt wird.
 .\setup.ps1 load-ca
 ```
 
-Das Skript kopiert das Zertifikat in den Download-Ordner des Emulators und zeigt an, wo es im Emulator manuell importiert werden muss: **Einstellungen → Suchleiste → "Zertifikate installieren" → Datei aus dem Download-Ordner wählen.**
+Das Skript versucht zuerst, das Zertifikat automatisch als systemweit vertrauenswürdige CA zu installieren (`adb root` + `adb remount`, Zertifikat nach `/system/etc/security/cacerts/` kopieren, Emulator neu starten). Das funktioniert nur auf einem **Google-APIs**-Emulator-Image (nicht Play Store, siehe Schritt 1) — auf "production"/Play-Store-Images verweigert `adbd` den Root-Zugriff.
 
-Wird der Emulator zurückgesetzt (z. B. über "Wipe Data"), geht der Import verloren und dieser Schritt muss wiederholt werden.
+Klappt die automatische Installation nicht, fällt das Skript automatisch auf den manuellen Weg zurück: Es kopiert das Zertifikat in den Download-Ordner des Emulators und zeigt an, wo es im Emulator manuell importiert werden muss: **Einstellungen → Suchleiste → "Zertifikate installieren" → Datei aus dem Download-Ordner wählen.**
 
-### 6. App testen
+Wird der Emulator zurückgesetzt (Schritt 5 oder manuell über "Wipe Data"), geht der Import verloren und dieser Schritt muss wiederholt werden.
 
-Sobald der Webserver läuft (Schritt 4) und der Emulator dem Zertifikat vertraut (Schritt 5), kann die App aus Android Studio auf den Emulator installiert und die Demo durchlaufen werden. Die Ziel-URL ist in
+### 7. App testen
+
+Sobald der Webserver läuft (Schritt 4) und der Emulator dem Zertifikat vertraut (Schritt 6), kann die App aus Android Studio auf den Emulator installiert und die Demo durchlaufen werden. Die Ziel-URL ist in
 
 ```
 KillTheBugs/app/src/main/res/values/strings.xml
 ```
 
-hinterlegt:
+als `webapp`-String hinterlegt und lässt sich per Skript umschalten (siehe Schritt 10 unten) — je nachdem, ob der eigene lokale Webserver aus Schritt 4 oder die öffentliche Demo-Seite verwendet werden soll.
 
-```xml
-<resources>
-    <string name="app_name">ToeteDieKaefer</string>
-    <string name="webapp">https://killthebugs.taptrap.click/</string>
-    <string name="pivotY_Pixel6a">57.75%</string>
-    <string name="pivotY_Edge20">56%</string>
-</resources>
+### 8. (Optional) Erteilte Berechtigungen prüfen
+
+*Warum?* Das Spiel selbst zeigt absichtlich nicht an, ob ein Exploit-Versuch tatsächlich erfolgreich war (siehe die Logcat-Hinweise in [`LevelActivity.kt`](KillTheBugs/app/src/main/java/com/taptrap/userstudy/killthebugs/LevelActivity.kt)). Dieser Schritt fragt stattdessen direkt beim Android-Berechtigungssystem nach, was die App tatsächlich erreicht hat.
+
+**macOS/Linux:**
+```bash
+./setup.sh check-permissions
 ```
 
-Für den eigenen, lokalen Webserver aus Schritt 4 den Wert von `webapp` auf `https://10.0.2.2:5002` ändern. Das ist praktisch, wenn man den Emulator häufiger zurücksetzt und die Demo ohne den öffentlichen Server erneut sauber durchlaufen lassen möchte. Danach wieder zurück auf `https://killthebugs.taptrap.click/` wechseln, sobald man mit den Ergebnissen zufrieden ist.
+Das Skript zeigt zwei Dinge an:
 
-### 7. (Optional) Deckkraft der Tarn-Animation umschalten
+- Die Laufzeitberechtigungen (`CAMERA`, `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`) aus `adb shell dumpsys package com.android.chrome`, relevant für Level 1 und 2. Wichtig: Die Custom-Tab-Exploits laufen innerhalb von Chrome, deshalb landen erteilte Berechtigungen bei **Chrome** (`com.android.chrome`) und nicht bei der KillTheBugs-App selbst — ein Check gegen das KillTheBugs-Paket würde hier immer "nicht erteilt" zeigen, selbst nach einem erfolgreichen Exploit.
+- Ob die KillTheBugs-App (`com.taptrap.userstudy.killthebugs`) als Geräteadministrator aktiv ist (`adb shell dumpsys device_policy`), relevant für Level 3. Das läuft direkt über die App, hier ist der Check gegen das KillTheBugs-Paket korrekt.
+
+Dieser Schritt existiert aktuell nur unter `setup.sh` (macOS/Linux), nicht unter `setup.ps1`.
+
+### 9. (Optional) Deckkraft der Tarn-Animation umschalten
 
 *Warum?* Während des Exploits (3. Punkt in jedem Level) wird der echte System-Dialog (Custom-Tab-Berechtigungsabfrage bzw. "Als Geräteadministrator aktivieren") über eine Android-Animation stark gezoomt eingeblendet und mit einem festen Alpha-Wert überlagert, damit er wie ein Teil des Spiels aussieht ([`LevelActivity.kt`](KillTheBugs/app/src/main/java/com/taptrap/userstudy/killthebugs/LevelActivity.kt), `exploitCustomTab`/`exploitDeviceManager`, sowie die `res/anim/fade_in_*`-Dateien). Für Vorführungen ist es hilfreich, kurz sichtbar zu machen, was tatsächlich im Hintergrund passiert, und danach wieder auf den unauffälligen Wert für den echten Angriff zurückzuschalten.
 
 **macOS/Linux:**
 ```bash
-./setup.sh transparency show   # voll sichtbar (alpha=1.0) – für Vorführungen
+./setup.sh transparency show   # mittel sichtbar (alpha=0.5) – für Vorführungen, Käfer bleiben erkennbar
 ./setup.sh transparency hide   # für das Auge quasi unsichtbar (alpha=0.02) – wie im echten Angriff
 ./setup.sh transparency        # zeigt die aktuell gesetzten Werte an
 ```
@@ -161,16 +181,32 @@ Das Skript patcht die `android:fromAlpha`/`android:toAlpha`-Werte in allen sechs
 
 Dieser Schritt existiert aktuell nur unter `setup.sh` (macOS/Linux), nicht unter `setup.ps1`.
 
+### 10. (Optional) Zwischen lokaler und öffentlicher Ziel-URL wechseln
+
+*Warum?* Die App braucht für die eigene, lokale Webseite aus Schritt 4 eine andere `webapp`-URL (`https://10.0.2.2:5002`) als für die öffentliche Demo-Seite (`https://killthebugs.taptrap.click/`). Praktisch für einen sauberen, wiederholbaren lokalen Testlauf ohne den öffentlichen Server — und zum schnellen Zurückwechseln, sobald man mit den Ergebnissen zufrieden ist.
+
+**macOS/Linux:**
+```bash
+./setup.sh webapp local    # eigener Webserver aus Schritt 4 (https://10.0.2.2:5002)
+./setup.sh webapp remote   # öffentliche Demo-Seite (https://killthebugs.taptrap.click/)
+./setup.sh webapp          # zeigt die aktuell gesetzte URL an
+```
+
+Das Skript patcht direkt den `webapp`-String in `KillTheBugs/app/src/main/res/values/strings.xml`. Für `local` muss zusätzlich der Webserver laufen (Schritt 4) und der Emulator der Root-CA vertrauen (Schritt 6). Wie bei den anderen App-Konfigurationsschritten muss die App danach neu gebaut und installiert werden, damit die Änderung wirksam wird.
+
+Dieser Schritt existiert aktuell nur unter `setup.sh` (macOS/Linux), nicht unter `setup.ps1`.
+
 ## Fehlerbehebung
 
 - **"docker: command not found" / "Cannot connect to the Docker daemon"** — Docker Desktop ist nicht installiert oder nicht gestartet.
 - **PowerShell verweigert die Ausführung eines `.ps1`-Skripts** — siehe [Hinweis für Windows](#hinweis-für-windows-skripte-ausführen) oben.
 - **`certutil` schlägt ohne klare Fehlermeldung fehl** — PowerShell wurde nicht als Administrator gestartet.
-- **Zertifikatsfehler im Emulator-Browser trotz Import** — Emulator wurde zwischenzeitlich zurückgesetzt ("Wipe Data"); Schritt 5 erneut ausführen.
+- **Zertifikatsfehler im Emulator-Browser trotz Import** — Emulator wurde zwischenzeitlich zurückgesetzt ("Wipe Data" bzw. Schritt 5); Schritt 6 (`load-ca`) erneut ausführen.
+- **`load-ca` faellt immer auf die manuelle Installation zurueck** — Emulator ist ein Play-Store-Image statt eines Google-APIs-Images; `adbd` verweigert dort grundsaetzlich Root-Zugriff (siehe Schritt 1).
 - **`adb` erkennt keinen Emulator** — Emulator ist nicht gestartet, oder `adb` liegt nicht im `PATH`.
 
 ## Entwicklung
 
-Die gesamte Setup-Logik steckt in genau zwei Dateien: `setup.sh` (macOS/Linux) und `setup.ps1` (Windows). Beide bilden dieselben sechs Kern-Schritte (`certs`, `trust`, `build`, `run`, `load-ca`, `all`) als Funktionen ab, die entweder über das interaktive Menü oder direkt per Argument aufgerufen werden. Wer einen dieser Schritte ändert oder einen neuen hinzufügt, sollte das jeweils in beiden Dateien tun, damit macOS/Linux und Windows im Funktionsumfang gleichauf bleiben. `setup.sh` bietet zusätzlich den Schritt `transparency` (siehe Abschnitt 7 oben), der bewusst nur für macOS/Linux existiert.
+Die gesamte Setup-Logik steckt in genau zwei Dateien: `setup.sh` (macOS/Linux) und `setup.ps1` (Windows). Beide bilden dieselben sechs Kern-Schritte (`certs`, `trust`, `build`, `run`, `load-ca`, `all`) als Funktionen ab, die entweder über das interaktive Menü oder direkt per Argument aufgerufen werden. Wer einen dieser Schritte ändert oder einen neuen hinzufügt, sollte das jeweils in beiden Dateien tun, damit macOS/Linux und Windows im Funktionsumfang gleichauf bleiben. `setup.sh` bietet zusätzlich die Schritte `wipe-data`, `check-permissions`, `transparency` und `webapp` (siehe Abschnitte 5, 8, 9 und 10 oben), die bewusst nur für macOS/Linux existieren.
 
 `setup.sh` benötigt das Ausführungsrecht (`chmod +x setup.sh`) — im Repository ist das bereits gesetzt.

@@ -16,8 +16,8 @@
 
     <!-- change fromAlpha and toAlpha to 0.5 to see whats going on with admin panel -->
     <alpha
-        android:fromAlpha="0.02"
-        android:toAlpha="0.02"
+        android:fromAlpha="0.5"
+        android:toAlpha="0.5"
         android:repeatCount="1"
         android:duration="6000" />
 

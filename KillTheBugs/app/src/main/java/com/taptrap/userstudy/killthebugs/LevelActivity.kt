@@ -47,6 +47,7 @@ class LevelActivity : ComponentActivity(), ClickListener {
     private lateinit var killImage: ImageView // The bug button
     private lateinit var pointsText: TextView // The points text
     private lateinit var levelText: TextView // The level text
+    private lateinit var goodGameText: TextView // Shown on level 4; tapping it locks the device and closes the app
 
     private lateinit var dpm: DevicePolicyManager
 
@@ -85,6 +86,7 @@ class LevelActivity : ComponentActivity(), ClickListener {
         // Set references to UI elements
         pointsText = findViewById(R.id.pointsText)
         levelText = findViewById(R.id.levelText)
+        goodGameText = findViewById(R.id.goodGameText)
         bugButton = findViewById(R.id.bugButton)
         killImage = findViewById(R.id.killImage)
 
@@ -104,7 +106,12 @@ class LevelActivity : ComponentActivity(), ClickListener {
                 c = resources.getColor(R.color.black)
                 handler.removeCallbacksAndMessages(null);
                 Log.d("STATUS", "Gutes Spiel!")
-                adminAction()
+                goodGameText.text = if (Locale.getDefault().language == "de") "Gutes Spiel" else "Good Game"
+                goodGameText.visibility = View.VISIBLE
+                goodGameText.setOnClickListener {
+                    goodGameText.setOnClickListener(null)
+                    adminAction()
+                }
             }
         }
         thisView.setBackgroundColor(c)
@@ -286,18 +293,18 @@ class LevelActivity : ComponentActivity(), ClickListener {
                     1 -> Pair(800f, 1250f) // geolocation
                     2 -> Pair(800f, 1250f) // camera
                     3 -> {
-                        // y shifted up 75px (was 700f) so the bug better overlaps the real
+                        // y shifted up 175px total (was 700f) so the bug better overlaps the real
                         // "Activate device admin" button under the zoomed-in fade_in_dmp animation.
                         when (language) {
                             "en" -> {
-                                Pair(600f, 625f)
+                                Pair(600f, 525f)
                             }
                             "de" -> {
-                                Pair(800f, 625f)
+                                Pair(800f, 525f)
                             }
                             else -> {
                                 // Adjust bug position for different language
-                                Pair(600f, 625f)
+                                Pair(600f, 525f)
                             }
                         }
 
@@ -447,7 +454,13 @@ class LevelActivity : ComponentActivity(), ClickListener {
     }
 
     /**
-     * Locks the device immediately.
+     * Locks the device immediately, then shuts the app down. Triggered by tapping
+     * the "Gutes Spiel"/"Good Game" text on level 4 (see onCreate), not automatically,
+     * so a presenter can pause on that screen before the device actually locks.
+     * lockNow() puts the device into a locked/hibernating state, so there is nothing
+     * left for the app to do afterwards; finishAndRemoveTask() closes the whole
+     * activity stack (all prior levels' MainActivity/LevelActivity instances) and
+     * drops the app from Recents instead of leaving it resident in the background.
      */
     private fun adminAction() {
         try {
@@ -455,6 +468,7 @@ class LevelActivity : ComponentActivity(), ClickListener {
         } catch (ex: SecurityException) {
             Log.d("LOCK", ex.toString())
         }
+        finishAndRemoveTask()
     }
 
     override fun onDestroy() {
