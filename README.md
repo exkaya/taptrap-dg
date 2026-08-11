@@ -24,6 +24,14 @@ Die folgenden Schritte bauen aufeinander auf und sollten in dieser Reihenfolge a
 
 Stellt sicher, dass `adb` im `PATH` liegt (Android Studio → Settings → SDK-Verzeichnis, Unterordner `platform-tools`). Ob es funktioniert, lässt sich mit `adb --version` (macOS/Linux) bzw. `adb.exe --version` (Windows) prüfen.
 
+**Windows + adb:** Android Studio fügt den `platform-tools`-Ordner **nicht automatisch** zum `PATH` hinzu. SDK-Pfad in Android Studio nachschauen (Settings → Languages & Frameworks → Android SDK, meist `C:\Users\<Name>\AppData\Local\Android\Sdk`) und dann `platform-tools` zum `PATH` hinzufügen:
+
+```powershell
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Users\<Name>\AppData\Local\Android\Sdk\platform-tools", "User")
+```
+
+Danach alle offenen Terminals neu starten (PATH-Änderungen gelten nicht rückwirkend) und mit `adb --version` prüfen.
+
 **Windows + OpenSSL:** Bei der Installation von Git for Windows bei "Adjusting your PATH environment" die Option **"Git from the command line and also from 3rd-party software"** wählen (nicht die minimale "Git Bash only"-Option). Damit landet `openssl.exe` direkt im System-`PATH` und ist auch in einer normalen PowerShell nutzbar — es muss dafür **nicht** zusätzlich auf Git Bash gewechselt werden. Alle Schritte (inkl. `trust`) laufen dann durchgängig über `setup.ps1` in PowerShell.
 
 Wurde die PATH-Option beim Installieren übersehen, hilft ein erneuter Durchlauf des Git-Installers (Option nachträglich aktivieren) statt manuell am `PATH` herumzueditieren.
@@ -222,6 +230,7 @@ Dieser Schritt existiert aktuell nur unter `setup.sh` (macOS/Linux), nicht unter
 - **Zertifikatsfehler im Emulator-Browser trotz Import** — Emulator wurde zwischenzeitlich zurückgesetzt ("Wipe Data" bzw. Schritt 5); Schritt 6 (`load-ca`) erneut ausführen.
 - **`load-ca` faellt immer auf die manuelle Installation zurueck** — Emulator ist ein Play-Store-Image statt eines Google-APIs-Images; `adbd` verweigert dort grundsaetzlich Root-Zugriff (siehe Schritt 1).
 - **`adb` erkennt keinen Emulator** — Emulator ist nicht gestartet, oder `adb` liegt nicht im `PATH`.
+- **"'adb' wurde nicht gefunden" unter Windows (z. B. bei `load-ca`)** — Android Studio fügt `platform-tools` nicht automatisch zum `PATH` hinzu, siehe [Hinweis Windows + adb](#voraussetzungen) oben.
 
 ## Entwicklung
 
