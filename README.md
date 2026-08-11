@@ -15,14 +15,18 @@ Die folgenden Schritte bauen aufeinander auf und sollten in dieser Reihenfolge a
 
 ## Voraussetzungen
 
-| Werkzeug | macOS | Windows |
-|---|---|---|
-| Android Studio (inkl. SDK, `adb`) | [Download](https://developer.android.com/studio) | [Download](https://developer.android.com/studio) |
-| Docker Desktop | [Download](https://www.docker.com/products/docker-desktop/) | [Download](https://www.docker.com/products/docker-desktop/) (WSL2-Backend empfohlen) |
-| OpenSSL | bereits vorinstalliert | über [Git for Windows](https://git-scm.com/download/win) (bringt `openssl.exe` mit) oder `winget install ShiningLight.OpenSSL` |
-| Terminal | Terminal.app / iTerm | PowerShell (vorinstalliert) |
+| Werkzeug | macOS | Linux | Windows |
+|---|---|---|---|
+| Android Studio (inkl. SDK, `adb`) | [Download](https://developer.android.com/studio) | [Download](https://developer.android.com/studio) | [Download](https://developer.android.com/studio) |
+| Docker | [Docker Desktop](https://www.docker.com/products/docker-desktop/) | [Docker Engine](https://docs.docker.com/engine/install/) (Ubuntu/Debian, Fedora/RHEL, …) oder Docker Desktop | [Docker Desktop](https://www.docker.com/products/docker-desktop/) (WSL2-Backend empfohlen) |
+| OpenSSL | bereits vorinstalliert | bereits vorinstalliert (sonst Paket `openssl` der Distribution) | über [Git for Windows](https://git-scm.com/download/win) (bringt `openssl.exe` mit) oder `winget install ShiningLight.OpenSSL` |
+| Terminal | Terminal.app / iTerm | Terminal der Distribution (z. B. GNOME Terminal, Konsole) | PowerShell (vorinstalliert) |
 
-Stellt sicher, dass `adb` im `PATH` liegt (Android Studio → Settings → SDK-Verzeichnis, Unterordner `platform-tools`). Ob es funktioniert, lässt sich mit `adb --version` (macOS) bzw. `adb.exe --version` (Windows) prüfen.
+Stellt sicher, dass `adb` im `PATH` liegt (Android Studio → Settings → SDK-Verzeichnis, Unterordner `platform-tools`). Ob es funktioniert, lässt sich mit `adb --version` (macOS/Linux) bzw. `adb.exe --version` (Windows) prüfen.
+
+**Windows + OpenSSL:** Bei der Installation von Git for Windows bei "Adjusting your PATH environment" die Option **"Git from the command line and also from 3rd-party software"** wählen (nicht die minimale "Git Bash only"-Option). Damit landet `openssl.exe` direkt im System-`PATH` und ist auch in einer normalen PowerShell nutzbar — es muss dafür **nicht** zusätzlich auf Git Bash gewechselt werden. Alle Schritte (inkl. `trust`) laufen dann durchgängig über `setup.ps1` in PowerShell.
+
+Wurde die PATH-Option beim Installieren übersehen, hilft ein erneuter Durchlauf des Git-Installers (Option nachträglich aktivieren) statt manuell am `PATH` herumzueditieren.
 
 ### Hinweis für Windows: Skripte ausführen
 
@@ -34,12 +38,24 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 Skripte, die Änderungen am System vornehmen (Zertifikatsspeicher), müssen zusätzlich **als Administrator** ausgeführt werden — das ist beim jeweiligen Schritt unten vermerkt.
 
+Meldet PowerShell trotzdem, dass das Skript nicht "digitally signed" sei (typisch auf verwalteten Hochschul-/Firmenrechnern, wo die Policy per Gruppenrichtlinie erzwungen wird und sich mit obigem Befehl nicht überschreiben lässt), jeden Aufruf stattdessen so voranstellen — das setzt die Policy nur für diesen einen Prozess, ohne etwas dauerhaft zu ändern:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup.ps1 certs
+powershell -ExecutionPolicy Bypass -File .\setup.ps1 trust
+```
+
+(usw. für jeden Schritt). Ob eine Gruppenrichtlinie greift, zeigt `Get-ExecutionPolicy -List` — stehen `MachinePolicy`/`UserPolicy` auf etwas anderem als `Undefined`, ist das der Grund.
+
+**Wichtig:** Auf Windows sollten alle Schritte über `setup.ps1` in PowerShell laufen, nicht über `setup.sh` in Git Bash — der `trust`-Schritt in `setup.sh` erkennt nur macOS und Linux (`uname -s`) und bricht unter Git Bash mit "Unbekanntes Betriebssystem" ab. Mit der obigen OpenSSL-Installation ist Git Bash für nichts mehr nötig.
+
 Alle Schritte unten werden über eines von zwei Setup-Skripten ausgeführt: `setup.sh` für macOS/Linux (Terminal) und `setup.ps1` für Windows (PowerShell). Windows-Skripte startet man mit vorangestelltem `.\`, z. B. `.\setup.ps1`.
 
-Beide Skripte lassen sich auf zwei Arten nutzen:
+Beide Skripte lassen sich auf drei Arten nutzen:
 
 - **Interaktiv:** einfach ohne Argumente aufrufen (`./setup.sh` bzw. `.\setup.ps1`) — es erscheint ein Menü, aus dem der gewünschte Schritt per Nummer oder Name ausgewählt wird.
-- **Direkt:** mit dem Schrittnamen als Argument, z. B. `./setup.sh certs` bzw. `.\setup.ps1 certs`. So lassen sich Schritte auch aus eigenen Skripten heraus automatisieren.
+- **Direkt:** mit dem Schrittnamen als Argument, z. B. `./setup.sh certs` bzw. `.\setup.ps1 certs`. So lassen sich Schritte auch aus eigenen Skripten heraus automatisieren. Manche Schritte akzeptieren zusätzliche Argumente, z. B. `./setup.sh transparency hide` oder `./setup.sh webapp remote`.
+- **Hilfe:** `./setup.sh --help` bzw. `.\setup.ps1 --help` (auch `-h`/`help`) zeigt alle Schritte samt ihrer möglichen Argumente und Beispielaufrufen an, ohne dass dafür die README durchsucht werden muss.
 
 Die verfügbaren Schritte sind `certs`, `trust`, `build`, `run`, `load-ca` und `all` (führt `certs`, `trust` und `build` nacheinander aus) — sie entsprechen den Schritten 2, 3, 4 und 6 weiter unten. Dazu kommen die optionalen Zusatzschritte `wipe-data` (Schritt 5), `check-permissions` (Schritt 8), `transparency` (Schritt 9) und `webapp` (Schritt 10), die es aktuell nur unter `setup.sh` (macOS/Linux) gibt. Schritt 7 "App testen" erfolgt manuell in Android Studio und hat keinen eigenen Setup-Schritt.
 
@@ -57,7 +73,7 @@ Für die Einrichtung von Android Studio sowie den benötigten `sdkmanager` und `
 
 Die Dateien landen direkt im Ordner `certs/` und müssen **einmalig** erzeugt werden. Sie sind bewusst in `.gitignore` eingetragen und werden nicht ins Repository übernommen.
 
-**macOS:**
+**macOS/Linux:**
 ```bash
 ./setup.sh certs
 ```
@@ -73,7 +89,7 @@ Am Ende sollte die Zeile `server.crt: OK` erscheinen. Erscheint sie nicht, stimm
 
 *Warum?* Der Browser/das System muss der selbst erstellten Root CA vertrauen, damit man die Webseite z. B. auch lokal im Browser ohne Zertifikatswarnung öffnen kann.
 
-**macOS** (fragt nach dem Login-Passwort):
+**macOS/Linux** (fragt nach einem Passwort — macOS: Login-Passwort für den Schlüsselbund, Linux: `sudo`-Passwort):
 ```bash
 ./setup.sh trust
 ```
@@ -89,9 +105,9 @@ Unter Linux wird sowohl Ubuntu/Debian (`update-ca-certificates`) als auch Fedora
 
 *Warum?* Die präparierte Webseite läuft in einem nginx-Container, der über Docker gebaut und gestartet wird. Docker sorgt dafür, dass es unabhängig vom Betriebssystem immer gleich funktioniert.
 
-Docker Desktop muss vorher gestartet sein.
+Docker (Docker Desktop bzw. unter Linux der Docker-Daemon) muss vorher gestartet sein.
 
-**macOS:**
+**macOS/Linux:**
 ```bash
 ./setup.sh build
 ./setup.sh run
@@ -124,7 +140,7 @@ Dieser Schritt existiert aktuell nur unter `setup.sh` (macOS/Linux), nicht unter
 
 Emulator muss laufen, bevor dieser Schritt ausgeführt wird.
 
-**macOS:**
+**macOS/Linux:**
 ```bash
 ./setup.sh load-ca
 ```
@@ -199,8 +215,10 @@ Dieser Schritt existiert aktuell nur unter `setup.sh` (macOS/Linux), nicht unter
 ## Fehlerbehebung
 
 - **"docker: command not found" / "Cannot connect to the Docker daemon"** — Docker Desktop ist nicht installiert oder nicht gestartet.
-- **PowerShell verweigert die Ausführung eines `.ps1`-Skripts** — siehe [Hinweis für Windows](#hinweis-für-windows-skripte-ausführen) oben.
+- **PowerShell verweigert die Ausführung eines `.ps1`-Skripts / meldet "not digitally signed"** — siehe [Hinweis für Windows](#hinweis-für-windows-skripte-ausführen) oben, insbesondere den `-ExecutionPolicy Bypass`-Fallback für per Gruppenrichtlinie verwaltete Rechner.
 - **`certutil` schlägt ohne klare Fehlermeldung fehl** — PowerShell wurde nicht als Administrator gestartet.
+- **"'openssl' wurde nicht gefunden" unter Windows** — Git for Windows wurde ohne die PATH-Option installiert, siehe [Hinweis Windows + OpenSSL](#voraussetzungen) oben.
+- **`./setup.sh trust` meldet "Unbekanntes Betriebssystem" in Git Bash unter Windows** — `setup.sh` unterstützt den `trust`-Schritt nur für macOS/Linux. Unter Windows stattdessen `.\setup.ps1 trust` (als Administrator) verwenden.
 - **Zertifikatsfehler im Emulator-Browser trotz Import** — Emulator wurde zwischenzeitlich zurückgesetzt ("Wipe Data" bzw. Schritt 5); Schritt 6 (`load-ca`) erneut ausführen.
 - **`load-ca` faellt immer auf die manuelle Installation zurueck** — Emulator ist ein Play-Store-Image statt eines Google-APIs-Images; `adbd` verweigert dort grundsaetzlich Root-Zugriff (siehe Schritt 1).
 - **`adb` erkennt keinen Emulator** — Emulator ist nicht gestartet, oder `adb` liegt nicht im `PATH`.

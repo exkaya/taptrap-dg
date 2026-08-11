@@ -1,6 +1,7 @@
 <#
 Interactive setup helper for Windows. Run without arguments for a menu,
 or pass a step name directly, e.g. .\setup.ps1 certs
+Run .\setup.ps1 --help for the full list of steps.
 #>
 param(
     [Parameter(Position = 0)]
@@ -172,6 +173,7 @@ function Invoke-Step {
         'run'     { Step-Run }
         'load-ca' { Step-LoadCA }
         'all'     { Step-All }
+        'help'    { Show-Help }
         default   { throw "Unbekannter Schritt: $Name" }
     }
 }
@@ -186,10 +188,47 @@ function Show-Menu {
     Write-Host " 4) run      Webserver starten (blockierend, Strg+C zum Beenden)"
     Write-Host " 5) load-ca  Root-Zertifikat auf den Emulator laden"
     Write-Host " 6) all      Schritte 1-3 nacheinander ausfuehren"
+    Write-Host " h) help     Diese Hilfe anzeigen (.\setup.ps1 --help)"
     Write-Host " 0) exit     Beenden"
 }
 
+function Show-Help {
+    Write-Host @"
+TapTrap Setup (Windows) - Hilfe
+================================
+
+Verwendung:
+  .\setup.ps1                 Interaktives Menue (Schritt per Nummer oder Name waehlen)
+  .\setup.ps1 <schritt>       Schritt direkt ausfuehren, z. B. aus eigenen Skripten heraus
+
+Schritte:
+  certs      TLS-Zertifikate erzeugen (einmalig)
+  trust      Root-Zertifikat auf diesem Rechner vertrauen (Admin!)
+  build      Webserver-Docker-Image bauen
+  run        Webserver starten (blockierend, Strg+C zum Beenden)
+  load-ca    Root-Zertifikat auf den Emulator laden
+  all        certs, trust und build nacheinander ausfuehren
+  --help, -h, help   Diese Hilfe anzeigen
+
+Jeder Schritt laesst sich auch ueber seine Menuenummer aufrufen, z. B. '.\setup.ps1 5'.
+
+Beispiele:
+  .\setup.ps1
+  .\setup.ps1 certs
+  .\setup.ps1 load-ca
+
+Die Zusatzschritte 'wipe-data', 'check-permissions', 'transparency' und 'webapp'
+gibt es aktuell nur unter setup.sh (macOS/Linux).
+
+Details zu jedem Schritt: siehe README.md.
+"@
+}
+
 # Nicht-interaktiv: .\setup.ps1 <schritt>
+if ($Step -in @('-h', '--help', 'help')) {
+    Show-Help
+    exit 0
+}
 if ($Step) {
     $resolved = if ($StepMap.ContainsKey($Step)) { $StepMap[$Step] } else { $Step }
     Invoke-Step -Name $resolved
@@ -201,6 +240,10 @@ while ($true) {
     Show-Menu
     $choice = Read-Host "Auswahl"
     if ($choice -eq '0' -or $choice -eq 'exit') { break }
+    if ($choice -in @('h', '-h', '--help', 'help')) {
+        Show-Help
+        continue
+    }
     $resolved = if ($StepMap.ContainsKey($choice)) { $StepMap[$choice] } else { $choice }
     try {
         Invoke-Step -Name $resolved

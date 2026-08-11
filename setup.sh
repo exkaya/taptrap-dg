@@ -1,6 +1,7 @@
 #!/bin/bash
 # Interactive setup helper for macOS/Linux. Run without arguments for a menu,
 # or pass a step name directly, e.g. `./setup.sh certs` or `./setup.sh transparency hide`.
+# Run `./setup.sh --help` for the full list of steps and their arguments.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -427,6 +428,7 @@ run_step() {
     8|transparency)      shift; step_transparency "${1:-}" ;;
     9|webapp)            shift; step_webapp "${1:-}" ;;
     10|all)              step_all ;;
+    h|-h|--help|help)    print_help ;;
     *) echo "Unbekannter Schritt: $1" >&2; return 1 ;;
   esac
 }
@@ -446,7 +448,48 @@ TapTrap Setup (macOS/Linux)
  8) transparency      Deckkraft der Tarn-Animation fuer Demo-Zwecke anpassen
  9) webapp            Zwischen lokaler und oeffentlicher Ziel-URL wechseln
 10) all               Schritte 1-3 nacheinander ausfuehren
+ h) help              Diese Hilfe mit allen Argumenten anzeigen (./setup.sh --help)
  0) exit              Beenden
+EOF
+}
+
+print_help() {
+  cat <<'EOF'
+TapTrap Setup (macOS/Linux) - Hilfe
+====================================
+
+Verwendung:
+  ./setup.sh                    Interaktives Menue (Schritt per Nummer oder Name waehlen)
+  ./setup.sh <schritt> [arg]    Schritt direkt ausfuehren, z. B. aus eigenen Skripten heraus
+
+Schritte:
+  certs                      TLS-Zertifikate erzeugen (einmalig)
+  trust                      Root-Zertifikat auf diesem Rechner vertrauen
+  build                      Webserver-Docker-Image bauen
+  run                        Webserver starten (blockierend, Strg+C zum Beenden)
+  wipe-data [yes]            Emulator auf Werkszustand zuruecksetzen (optional)
+                             'yes' ueberspringt die Sicherheitsabfrage
+  load-ca                    Root-Zertifikat auf den Emulator laden
+                             (automatisch als System-CA, mit manuellem Fallback)
+  check-permissions          Erteilte Berechtigungen/Geraeteadmin-Status der App pruefen
+  transparency [show|hide]   Deckkraft der Tarn-Animation umschalten
+                             ohne Argument: zeigt die aktuell gesetzten Werte an
+  webapp [local|remote]      Zwischen lokaler und oeffentlicher Ziel-URL wechseln
+                             ohne Argument: zeigt die aktuell gesetzte URL an
+  all                        certs, trust und build nacheinander ausfuehren
+  --help, -h, help           Diese Hilfe anzeigen
+
+Jeder Schritt laesst sich auch ueber seine Menuenummer aufrufen, z. B. './setup.sh 8 show'.
+
+Beispiele:
+  ./setup.sh
+  ./setup.sh certs
+  ./setup.sh transparency hide
+  ./setup.sh transparency show
+  ./setup.sh webapp remote
+  ./setup.sh wipe-data yes
+
+Details zu jedem Schritt: siehe README.md.
 EOF
 }
 
