@@ -223,6 +223,7 @@ Dieser Schritt existiert aktuell nur unter `setup.sh` (macOS/Linux), nicht unter
 ## Fehlerbehebung
 
 - **"docker: command not found" / "Cannot connect to the Docker daemon"** — Docker Desktop ist nicht installiert oder nicht gestartet.
+- **`./setup.sh run` schlägt mit "Permission denied" beim Lesen von `server.crt`/`server.key` fehl, obwohl Docker läuft und die Gruppenmitgliedschaft stimmt (z. B. Fedora/RHEL)** — SELinux blockiert den Zugriff des Containers auf die gemounteten Dateien. Das Skript erkennt aktives SELinux automatisch (`getenforce`) und hängt in diesem Fall `,z` an die Bind-Mounts an; betrifft nur `setup.sh`, nicht `setup.ps1` (Windows kennt kein SELinux).
 - **PowerShell verweigert die Ausführung eines `.ps1`-Skripts / meldet "not digitally signed"** — siehe [Hinweis für Windows](#hinweis-für-windows-skripte-ausführen) oben, insbesondere den `-ExecutionPolicy Bypass`-Fallback für per Gruppenrichtlinie verwaltete Rechner.
 - **`certutil` schlägt ohne klare Fehlermeldung fehl** — PowerShell wurde nicht als Administrator gestartet.
 - **"'openssl' wurde nicht gefunden" unter Windows** — Git for Windows wurde ohne die PATH-Option installiert, siehe [Hinweis Windows + OpenSSL](#voraussetzungen) oben.

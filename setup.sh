@@ -140,10 +140,17 @@ step_run() {
     echo "Fehler: Zertifikate fehlen. Zuerst Schritt 'certs' ausfuehren." >&2
     return 1
   fi
+  local vol_opts="ro"
+  if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" != "Disabled" ]; then
+    # SELinux (z. B. Fedora/RHEL) verweigert dem Container sonst den Zugriff auf die
+    # gemounteten Dateien, obwohl die Unix-Rechte passen ("Permission denied" trotz
+    # laufendem Docker + korrekter Gruppenmitgliedschaft).
+    vol_opts="ro,z"
+  fi
   docker run --rm \
     -p 5002:5002 \
-    -v "$PWD/$CERT_DIR/server.crt:/etc/nginx/certs/server.crt:ro" \
-    -v "$PWD/$CERT_DIR/server.key:/etc/nginx/certs/server.key:ro" \
+    -v "$PWD/$CERT_DIR/server.crt:/etc/nginx/certs/server.crt:$vol_opts" \
+    -v "$PWD/$CERT_DIR/server.key:/etc/nginx/certs/server.key:$vol_opts" \
     tt-site
 }
 
