@@ -292,27 +292,11 @@ class LevelActivity : ComponentActivity(), ClickListener {
                 val exploitPosition = when (level) {
                     1 -> Pair(800f, 1250f) // geolocation
                     2 -> Pair(800f, 1250f) // camera
-                    3 -> {
-                        // y shifted up 175px total (was 700f) so the bug better overlaps the real
-                        // "Activate device admin" button under the zoomed-in fade_in_dmp animation.
-                        when (language) {
-                            "en" -> {
-                                Pair(600f, 525f)
-                            }
-                            "de" -> {
-                                Pair(800f, 525f)
-                            }
-                            else -> {
-                                // Adjust bug position for different language
-                                Pair(600f, 525f)
-                            }
-                        }
-
-                    } // device admin, tune this separately
-                    else -> Pair(750f, 1300f)
+                    3 -> Pair(800f, 400f) // device admin, tune this separately
+                    else -> Pair(800f, 400f)
                 }
 
-                // Before exploit
+                // Before exp8loit
                 bugButton.x = exploitPosition.first
                 bugButton.y = exploitPosition.second
                 killImage.x = exploitPosition.first
