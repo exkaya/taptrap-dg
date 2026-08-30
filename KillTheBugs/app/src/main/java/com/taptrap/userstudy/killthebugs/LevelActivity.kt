@@ -40,6 +40,13 @@ class LevelActivity : ComponentActivity(), ClickListener {
 
     private var exploitationFailedHandler = Handler(Looper.getMainLooper())  // Create a handler
 
+    // Handles moving a normal (non-exploit) bug to a new random spot if the player
+    // doesn't hit it in time. Never used for the exploit-position bug (see
+    // drawBugForNextRound), which must stay put so its position lines up with the
+    // real permission dialog.
+    private var missedBugHandler = Handler(Looper.getMainLooper())
+    private var bugMissTimeout: Long = 1500
+
     private lateinit var customTabHelper: CustomTabHelper
     private lateinit var permissionAPIUrl: String
 
@@ -139,6 +146,21 @@ class LevelActivity : ComponentActivity(), ClickListener {
 
         // Register Click Handler
         bugButton.setOnClickListener {
+            if (exploitOngoing) {
+                // During the exploit round, the bug is only there so its position
+                // lines up with the real permission dialog underneath - the actual
+                // tap is meant to land on that dialog, not on our own button. Only
+                // CustomTabHelper's navigation callback (clicked(true)) may resolve
+                // this round. If a tap also reaches this button (e.g. it lands a
+                // moment before the Custom Tab's overlay has fully taken over
+                // input), treating it as a hit here would increment points/advance
+                // the level directly, racing ahead of - and independently of -
+                // whether the real permission was ever granted. That desyncs the
+                // game from the still-open Custom Tab, which then surfaces as a
+                // leftover/next permission prompt appearing on a later tap.
+                return@setOnClickListener
+            }
+
             points ++
             pointsText.text = "$points Punkte"
 
@@ -200,6 +222,9 @@ class LevelActivity : ComponentActivity(), ClickListener {
             return
         }
 
+        // The bug is being resolved now (hit, or its own miss-timeout firing), so
+        // any pending "move it elsewhere" callback for it is no longer relevant.
+        missedBugHandler.removeCallbacksAndMessages(null)
 
         //bugButton.visibility = View.GONE
         killImage.visibility = View.INVISIBLE
@@ -338,6 +363,16 @@ class LevelActivity : ComponentActivity(), ClickListener {
             animateBtn()
             expandBugButtonTouchArea()
             killImage.visibility = View.GONE
+
+            // If the player doesn't hit this bug in time, treat it as a miss so it
+            // moves to a new random spot instead of sitting there indefinitely.
+            missedBugHandler.removeCallbacksAndMessages(null)
+            missedBugHandler.postDelayed({
+                if (bugButton.isEnabled) {
+                    Log.d("STATUS", "Bug missed, moving")
+                    clicked(false)
+                }
+            }, bugMissTimeout)
         }
     }
 
@@ -364,7 +399,7 @@ class LevelActivity : ComponentActivity(), ClickListener {
     private fun restart() {
         Log.d("STATUS", "Restart")
         val self = Intent(this, LevelActivity::class.java)
-        self.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        self.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
 
         val flowerTuples: ArrayList<Pair<Float, Float>> = ArrayList<Pair<Float, Float>>()
         for (flower in flowers) {
@@ -376,6 +411,15 @@ class LevelActivity : ComponentActivity(), ClickListener {
         self.putExtra("level", level)
         self.putExtra("adminMode", adminMode)
         startActivity(self)
+        // Finish this instance so its Handler callbacks (flower spawner, pending
+        // drawBugForNextRound/exploitation-failed timers) and CustomTabHelper binding
+        // don't keep running in the background after the new round's activity takes
+        // over. Previously this was left out and relied on FLAG_ACTIVITY_SINGLE_TOP,
+        // but since LevelActivity never overrides onNewIntent(), that reuse path
+        // silently dropped the updated "points" extra (no onResume() rerun) and left
+        // a growing stack of live zombie instances that could independently trigger
+        // their own delayed exploits later, regardless of which level was on screen.
+        finish()
     }
 
     /**
@@ -389,6 +433,7 @@ class LevelActivity : ComponentActivity(), ClickListener {
         self.putExtra("level", level + 1)
         self.putExtra("adminMode", adminMode)
         startActivity(self, options.toBundle())
+        finish()
     }
 
     /**
@@ -460,6 +505,8 @@ class LevelActivity : ComponentActivity(), ClickListener {
         // Unbind the Custom Tabs Service when the activity is destroyed
         customTabHelper.unbindService()
         handler.removeCallbacksAndMessages(null);
+        exploitationFailedHandler.removeCallbacksAndMessages(null);
+        missedBugHandler.removeCallbacksAndMessages(null);
     }
 
     /**

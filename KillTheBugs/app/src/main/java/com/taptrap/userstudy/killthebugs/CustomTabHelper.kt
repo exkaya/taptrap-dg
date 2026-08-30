@@ -86,6 +86,16 @@ class CustomTabHelper(private val context: Context, private val clickListener: C
      */
     fun openCustomTab(url: String, mode: String) {
 
+        // Scope the navigation count to this exploit attempt. Without this, the
+        // one-time mayLaunchUrl() warmup navigation (fired once, early, right after
+        // the service connects, for the bare base URL) stayed counted alongside the
+        // real navigation, so startedCount could already reach 2 the moment this tab
+        // opened - before the user ever tapped anything. That fired clicked(true)
+        // on page load instead of on the actual tap, so the real, meaningful
+        // navigation (index.html -> /success, triggered only once the permission
+        // prompt is resolved or the page body is tapped) was silently ignored.
+        startedCount = 0
+
         val fadeIn: Int
         when(mode) {
             "geolocation" -> {

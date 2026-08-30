@@ -127,10 +127,20 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-      renderSavedLocation();
-      startLocationWatcherIfAllowed();
-      observePermissionChanges();
-      startAutoLoop();
+      // Only act on the permission that was actually exploited on the previous
+      // page. Previously this always requested the camera regardless of which
+      // access mode the level was for, so granting geolocation on level 1
+      // immediately triggered a second, real (non-tapjacked) Chrome camera
+      // prompt with no relation to the game's timing/positioning at all.
+      const access = new URLSearchParams(window.location.search).get("access");
+
+      if (access === "geolocation") {
+        renderSavedLocation();
+        startLocationWatcherIfAllowed();
+      } else if (access === "camera") {
+        observePermissionChanges();
+        startAutoLoop();
+      }
     });
 
   </script>

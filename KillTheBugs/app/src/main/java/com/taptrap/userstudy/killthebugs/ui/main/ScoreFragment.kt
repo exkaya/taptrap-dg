@@ -62,6 +62,7 @@ class ScoreFragment : Fragment() {
             // set an entry animation for the activity
             val options = ActivityOptions.makeCustomAnimation(requireContext(), R.anim.regular_fade_in, R.anim.regular_fade_out).toBundle()
             startActivity(intent, options)
+            activity?.finish()
         }, 2000)
     }
 }

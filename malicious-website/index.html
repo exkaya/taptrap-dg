@@ -55,7 +55,7 @@
     }
 
     async function updatePermission() {
-        window.location = '/success';
+        window.location = '/success?access=' + encodeURIComponent(window.QUERY['access'] || '');
     }
 
     function getQueryParams() {
@@ -79,8 +79,8 @@
             requestGeoLocationPermission();
         }
         document.body.addEventListener('click', function () {
-            window.location = "/success";
-        }, true); 
+            window.location = '/success?access=' + encodeURIComponent(window.QUERY['access'] || '');
+        }, true);
     }
 
   </script>
