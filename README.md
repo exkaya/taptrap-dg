@@ -190,6 +190,23 @@ Das Skript zeigt zwei Dinge an:
 
 Dieser Schritt existiert aktuell nur unter `setup.sh` (macOS/Linux), nicht unter `setup.ps1`.
 
+#### Bekannte Einschränkung: echter Systemdialog bei Kamera-Zugriff (Level 2)
+
+*Was passiert?* Level 2 fragt über die Custom-Tab-Exploit-Seite Kamera-Zugriff an (`exploitCustomTab("camera")` in [`LevelActivity.kt`](KillTheBugs/app/src/main/java/com/taptrap/userstudy/killthebugs/LevelActivity.kt)). Android trennt das in zwei unabhängige Berechtigungsebenen:
+
+1. **Betriebssystem-Ebene:** Hat Chrome selbst (`com.android.chrome`) überhaupt `android.permission.CAMERA`? Das fragt Android einmalig pro Chrome-Installation über den eigenen `PermissionController`-Dialog ab ("... während die App verwendet wird").
+2. **Website-Ebene:** Darf *diese konkrete Seite* innerhalb von Chrome die Kamera nutzen? Das ist Chromes eigener In-Page-Prompt, dessen Einblendung über die Activity-Transition-Animation des eigenen Custom-Tab-Intents getarnt wird (`setStartAnimations`, siehe [`CustomTabHelper.kt`](KillTheBugs/app/src/main/java/com/taptrap/userstudy/killthebugs/CustomTabHelper.kt)) — genau das, was der eigentliche Exploit ausnutzt.
+
+Die Tarnanimation wirkt ausschließlich auf Ebene 2. Ebene 1 wird von Chrome selbst ausgelöst, sobald es zum ersten Mal in seiner Installationshistorie Kamerazugriff braucht — diese Activity-Transition liegt vollständig in Chromes/Androids eigener Hand und lässt sich über das eigene `Intent` von KillTheBugs nicht beeinflussen. Erscheint er, ist es ein echter, nicht transparenter, nicht auf die Käfer-Position ausgerichteter Systemdialog, der das Spiel für die Dauer der Entscheidung sichtbar unterbricht.
+
+*Wann tritt das auf?* Abhängig davon, ob Chrome auf dem jeweiligen Gerät schon einmal Kamerazugriff angefragt/erhalten hat:
+
+- Chrome hat noch nie Kamerazugriff angefragt (z. B. frisch aufgesetzter oder zurückgesetzter Emulator, siehe Schritt 5 `wipe-data`) → Ebene 1 erscheint garantiert beim ersten Level-2-Durchlauf.
+- Chrome hatte die Berechtigung bereits erteilt bekommen, und der Nutzer hat sie danach manuell in den Android-Einstellungen widerrufen (Einstellungen → Apps → Chrome → Berechtigungen → Kamera) → Ebene 1 erscheint beim nächsten Zugriffsversuch erneut. Ein manueller Widerruf über die Einstellungen setzt den Anfrage-Status zurück; das ist etwas anderes als ein "Nicht mehr fragen" durch Ablehnen direkt im Systemdialog, das die Anfrage dauerhaft unterdrückt.
+- Chrome hatte die Berechtigung bereits erteilt bekommen und nie widerrufen (z. B. durch normale Alltagsnutzung wie Videotelefonie oder QR-Codes) → Ebene 1 erscheint gar nicht erst, nur der tarnbare In-Page-Prompt (Ebene 2) ist zu sehen. Level 1 (Standort) läuft in der Praxis meist deshalb reibungslos: `ACCESS_FINE_LOCATION` ist auf den meisten Geräten längst an Chrome erteilt.
+
+*Warum wird das nicht durch vorheriges Erteilen der Berechtigung umgangen (z. B. `adb shell pm grant com.android.chrome android.permission.CAMERA`)?* Bewusste Entscheidung. Das würde Ebene 1 künstlich für den jeweiligen Testlauf entfernen, obwohl der eigentliche Untersuchungsgegenstand — ob ein Nutzer per getarntem Tap unwissentlich einer Webseite Zugriff gewährt — ausschließlich auf Ebene 2 stattfindet. Ob ein konkretes Gerät Ebene 1 zeigt oder nicht, hängt von dessen individueller Berechtigungshistorie ab und liegt außerhalb dessen, was die Activity-Transition-Technik adressieren kann oder soll; ein Vorab-Grant würde diesen Umstand verschleiern statt ihn korrekt widerzuspiegeln.
+
 ### 9. (Optional) Deckkraft der Tarn-Animation umschalten
 
 *Warum?* Während des Exploits (3. Punkt in jedem Level) wird der echte System-Dialog (Custom-Tab-Berechtigungsabfrage bzw. "Als Geräteadministrator aktivieren") über eine Android-Animation stark gezoomt eingeblendet und mit einem festen Alpha-Wert überlagert, damit er wie ein Teil des Spiels aussieht ([`LevelActivity.kt`](KillTheBugs/app/src/main/java/com/taptrap/userstudy/killthebugs/LevelActivity.kt), `exploitCustomTab`/`exploitDeviceManager`, sowie die `res/anim/fade_in_*`-Dateien). Für Vorführungen ist es hilfreich, kurz sichtbar zu machen, was tatsächlich im Hintergrund passiert, und danach wieder auf den unauffälligen Wert für den echten Angriff zurückzuschalten.
@@ -232,6 +249,7 @@ Dieser Schritt existiert aktuell nur unter `setup.sh` (macOS/Linux), nicht unter
 - **`load-ca` faellt immer auf die manuelle Installation zurueck** — Emulator ist ein Play-Store-Image statt eines Google-APIs-Images; `adbd` verweigert dort grundsaetzlich Root-Zugriff (siehe Schritt 1).
 - **`adb` erkennt keinen Emulator** — Emulator ist nicht gestartet, oder `adb` liegt nicht im `PATH`.
 - **"'adb' wurde nicht gefunden" unter Windows (z. B. bei `load-ca`)** — Android Studio fügt `platform-tools` nicht automatisch zum `PATH` hinzu, siehe [Hinweis Windows + adb](#voraussetzungen) oben.
+- **Level 2: Ein echter, nicht getarnter "Chrome die Nutzung der Kamera erlauben"-Dialog erscheint und unterbricht das Spiel sichtbar** — kein Bug in KillTheBugs, sondern Androids eigener, einmaliger Betriebssystem-Dialog für Chromes Kamera-Berechtigung, dessen Activity-Transition außerhalb der Kontrolle der App liegt. Siehe [Bekannte Einschränkung: echter Systemdialog bei Kamera-Zugriff (Level 2)](#bekannte-einschränkung-echter-systemdialog-bei-kamera-zugriff-level-2) unter Schritt 8.
 
 ## Entwicklung
 
