@@ -488,8 +488,17 @@ class LevelActivity : ComponentActivity(), ClickListener {
      * so a presenter can pause on that screen before the device actually locks.
      * lockNow() puts the device into a locked/hibernating state, so there is nothing
      * left for the app to do afterwards; finishAndRemoveTask() closes the whole
-     * activity stack (all prior levels' MainActivity/LevelActivity instances) and
-     * drops the app from Recents instead of leaving it resident in the background.
+     * activity stack and drops the app from Recents instead of leaving it resident
+     * in the background.
+     *
+     * finishAndRemoveTask() alone was not reliable here: it races with lockNow()
+     * turning the screen off right around the same moment, and Android's own
+     * task/instance-state snapshotting for Recents could still capture something
+     * (e.g. a still-alive earlier LevelActivity) before the task teardown fully
+     * took effect - reopening the app could then restore that stale state (seen as
+     * jumping back to an earlier level with 0 points) instead of cold-starting
+     * MainActivity fresh. Killing the process outright removes anything Android
+     * could possibly restore from, so the next launch is always a clean start.
      */
     private fun adminAction() {
         try {
@@ -498,6 +507,7 @@ class LevelActivity : ComponentActivity(), ClickListener {
             Log.d("LOCK", ex.toString())
         }
         finishAndRemoveTask()
+        android.os.Process.killProcess(android.os.Process.myPid())
     }
 
     override fun onDestroy() {
